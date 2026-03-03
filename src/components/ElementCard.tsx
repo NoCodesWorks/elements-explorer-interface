@@ -1,5 +1,5 @@
-import { useState } from "react";
-import type { Element, ElementCategory } from "@/data/elements";
+import type { Element, ElementCategory, Phase } from "@/data/elements";
+import { getPhase } from "@/data/elements";
 
 const categoryColorMap: Record<ElementCategory, string> = {
   alkali: "bg-element-alkali/20 border-element-alkali/50 hover:bg-element-alkali/35 hover:border-element-alkali",
@@ -15,6 +15,13 @@ const categoryColorMap: Record<ElementCategory, string> = {
   unknown: "bg-element-unknown/20 border-element-unknown/50 hover:bg-element-unknown/35 hover:border-element-unknown",
 };
 
+const phaseIndicator: Record<Phase, string> = {
+  solid: "bg-phase-solid",
+  liquid: "bg-phase-liquid",
+  gas: "bg-phase-gas",
+  unknown: "bg-phase-unknown",
+};
+
 const dimmedClass = "opacity-20";
 
 interface ElementCardProps {
@@ -22,10 +29,12 @@ interface ElementCardProps {
   highlighted: ElementCategory | null;
   onHover: (cat: ElementCategory | null) => void;
   onClick: (el: Element) => void;
+  temperature: number;
 }
 
-export function ElementCard({ element, highlighted, onHover, onClick }: ElementCardProps) {
+export function ElementCard({ element, highlighted, onHover, onClick, temperature }: ElementCardProps) {
   const isDimmed = highlighted !== null && highlighted !== element.category;
+  const phase = getPhase(element, temperature);
 
   return (
     <button
@@ -45,6 +54,8 @@ export function ElementCard({ element, highlighted, onHover, onClick }: ElementC
       onMouseLeave={() => onHover(null)}
       onClick={() => onClick(element)}
     >
+      {/* Phase indicator dot */}
+      <span className={`absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full ${phaseIndicator[phase]}`} />
       <span className="text-[0.45rem] leading-none text-muted-foreground font-mono-code">
         {element.number}
       </span>

@@ -70,6 +70,12 @@ export default {
           actinide: "hsl(var(--cat-actinide))",
           unknown: "hsl(var(--cat-unknown))",
         },
+        phase: {
+          solid: "hsl(var(--phase-solid))",
+          liquid: "hsl(var(--phase-liquid))",
+          gas: "hsl(var(--phase-gas))",
+          unknown: "hsl(var(--phase-unknown))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

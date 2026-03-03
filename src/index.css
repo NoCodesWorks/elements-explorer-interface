@@ -49,6 +49,12 @@
     --cat-actinide: 90 45% 45%;
     --cat-unknown: 220 15% 35%;
 
+    /* Phase colors */
+    --phase-solid: 35 90% 55%;
+    --phase-liquid: 200 80% 55%;
+    --phase-gas: 140 60% 50%;
+    --phase-unknown: 220 10% 40%;
+
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
