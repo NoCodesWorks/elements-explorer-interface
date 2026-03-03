@@ -1,6 +1,9 @@
 import type { Element } from "@/data/elements";
 import { categoryLabels, getPhase } from "@/data/elements";
+import { dftDatabase, phaseDiagrams } from "@/data/dftData";
 import { ElectronShellDiagram } from "@/components/ElectronShellDiagram";
+import { DftProperties } from "@/components/DftProperties";
+import { PhaseDiagram } from "@/components/PhaseDiagram";
 import { X } from "lucide-react";
 
 const categoryBgMap: Record<string, string> = {
@@ -95,6 +98,16 @@ export function ElementDetail({ element, onClose, temperature }: ElementDetailPr
           <span className="text-muted-foreground text-xs">Electron Configuration</span>
           <p className="font-mono-code text-foreground text-sm mt-0.5">{element.electronConfig}</p>
         </div>
+
+        {/* DFT Properties */}
+        {dftDatabase[element.number] && (
+          <DftProperties data={dftDatabase[element.number]} />
+        )}
+
+        {/* Phase Diagram */}
+        {phaseDiagrams[element.number] && (
+          <PhaseDiagram data={phaseDiagrams[element.number]} />
+        )}
       </div>
     </div>
   );
