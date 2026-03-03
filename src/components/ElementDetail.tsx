@@ -1,5 +1,5 @@
 import type { Element } from "@/data/elements";
-import { categoryLabels } from "@/data/elements";
+import { categoryLabels, getPhase } from "@/data/elements";
 import { X } from "lucide-react";
 
 const categoryBgMap: Record<string, string> = {
@@ -19,13 +19,22 @@ const categoryBgMap: Record<string, string> = {
 interface ElementDetailProps {
   element: Element;
   onClose: () => void;
+  temperature: number;
 }
 
-export function ElementDetail({ element, onClose }: ElementDetailProps) {
+function formatTemp(k: number | null): string {
+  if (k === null) return "—";
+  return `${k} K (${(k - 273.15).toFixed(0)} °C)`;
+}
+
+export function ElementDetail({ element, onClose, temperature }: ElementDetailProps) {
+  const phase = getPhase(element, temperature);
+  const phaseLabel = phase === "unknown" ? "Unknown" : phase.charAt(0).toUpperCase() + phase.slice(1);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="relative bg-card border border-border rounded-lg p-6 w-80 shadow-2xl"
+        className="relative bg-card border border-border rounded-lg p-6 w-96 shadow-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <button onClick={onClose} className="absolute top-3 right-3 text-muted-foreground hover:text-foreground transition-colors">
@@ -57,6 +66,30 @@ export function ElementDetail({ element, onClose }: ElementDetailProps) {
             <span className="text-muted-foreground text-xs">Group</span>
             <p className="font-mono-code text-foreground">{element.col}</p>
           </div>
+          <div>
+            <span className="text-muted-foreground text-xs">Electronegativity</span>
+            <p className="font-mono-code text-foreground">{element.electronegativity ?? "—"}</p>
+          </div>
+          <div>
+            <span className="text-muted-foreground text-xs">Discovery</span>
+            <p className="font-mono-code text-foreground">{element.discoveryYear}</p>
+          </div>
+          <div>
+            <span className="text-muted-foreground text-xs">Melting Point</span>
+            <p className="font-mono-code text-foreground text-[0.7rem]">{formatTemp(element.meltingPoint)}</p>
+          </div>
+          <div>
+            <span className="text-muted-foreground text-xs">Boiling Point</span>
+            <p className="font-mono-code text-foreground text-[0.7rem]">{formatTemp(element.boilingPoint)}</p>
+          </div>
+          <div>
+            <span className="text-muted-foreground text-xs">Phase @ {temperature} K</span>
+            <p className="text-foreground font-medium">{phaseLabel}</p>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-border">
+          <span className="text-muted-foreground text-xs">Electron Configuration</span>
+          <p className="font-mono-code text-foreground text-sm mt-0.5">{element.electronConfig}</p>
         </div>
       </div>
     </div>
