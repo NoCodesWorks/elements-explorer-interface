@@ -70,7 +70,7 @@ const Index = () => {
     const diagram = getBinaryDiagram(binarySelection[0].number, binarySelection[1].number);
     if (!diagram) {
       setBinaryError(
-        `No CALPHAD data available for ${binarySelection[0].symbol}–${binarySelection[1].symbol}. Try: Fe–C, Cu–Zn, Al–Cu, Ti–Al, Ni–Al, Pb–Sn, Si–Ge, Au–Cu.`,
+        `No CALPHAD data available for ${binarySelection[0].symbol}–${binarySelection[1].symbol}. Try: Fe–C, Cu–Zn, Al–Cu, Ti–Al, Ni–Al, Pb–Sn, Si–Ge, Au–Cu, Fe–Ni, Cu–Sn, Al–Si, Ag–Cu.`,
       );
       return;
     }
