@@ -35,7 +35,6 @@ serve(async (req) => {
     const defaultFields = [
       "material_id",
       "formula_pretty",
-      "structure",
       "symmetry",
       "band_gap",
       "is_metal",
@@ -52,19 +51,18 @@ serve(async (req) => {
 
     const requestedFields = fields && Array.isArray(fields) ? fields : defaultFields;
 
-    const url = "https://api.materialsproject.org/materials/summary/";
-    const body = {
-      material_ids: ids,
-      fields: requestedFields,
-    };
+    const params = new URLSearchParams();
+    params.append("material_ids", ids.join(","));
+    params.append("_fields", requestedFields.join(","));
+    // Remove 'structure' field - too large for summary GET
+    const url = `https://api.materialsproject.org/materials/summary/?${params.toString()}`;
 
     const response = await fetch(url, {
-      method: "POST",
+      method: "GET",
       headers: {
         "X-API-KEY": apiKey,
-        "Content-Type": "application/json",
+        "accept": "application/json",
       },
-      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
