@@ -57,6 +57,19 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        element: {
+          alkali: "hsl(var(--cat-alkali))",
+          alkaline: "hsl(var(--cat-alkaline))",
+          transition: "hsl(var(--cat-transition))",
+          "post-transition": "hsl(var(--cat-post-transition))",
+          metalloid: "hsl(var(--cat-metalloid))",
+          nonmetal: "hsl(var(--cat-nonmetal))",
+          halogen: "hsl(var(--cat-halogen))",
+          noble: "hsl(var(--cat-noble))",
+          lanthanide: "hsl(var(--cat-lanthanide))",
+          actinide: "hsl(var(--cat-actinide))",
+          unknown: "hsl(var(--cat-unknown))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -65,20 +78,12 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
       },
       animation: {
