@@ -1,9 +1,15 @@
 import type { Element } from "@/data/elements";
 import { categoryLabels, getPhase } from "@/data/elements";
 import { dftDatabase, phaseDiagrams } from "@/data/dftData";
+import { mechanicalDatabase } from "@/data/mechanicalProperties";
+import { ellinghamReactions } from "@/data/ellinghamData";
 import { ElectronShellDiagram } from "@/components/ElectronShellDiagram";
 import { SubshellDiagram } from "@/components/SubshellDiagram";
 import { EnergyBandDiagram } from "@/components/EnergyBandDiagram";
+import { CrystalStructureViewer } from "@/components/CrystalStructureViewer";
+import { MechanicalPropertiesCard } from "@/components/MechanicalPropertiesCard";
+import { EllinghamDiagram } from "@/components/EllinghamDiagram";
+import { TTTDiagramViewer } from "@/components/TTTDiagramViewer";
 import { DftProperties } from "@/components/DftProperties";
 import { MPProperties } from "@/components/MPProperties";
 import { PhaseDiagram } from "@/components/PhaseDiagram";
@@ -115,6 +121,37 @@ export function ElementDetail({ element, onClose, temperature }: ElementDetailPr
           <span className="text-muted-foreground text-xs">Electron Configuration</span>
           <p className="font-mono-code text-foreground text-sm mt-0.5">{element.electronConfig}</p>
         </div>
+
+        {/* Crystal Structure & Mechanical Properties */}
+        {mechanicalDatabase[element.number] && (
+          <>
+            <div className="mt-4 p-3 rounded-md bg-background/50 border border-border">
+              <h3 className="text-xs text-muted-foreground mb-2 text-center font-medium">Crystal Structure</h3>
+              <CrystalStructureViewer data={mechanicalDatabase[element.number]} />
+            </div>
+
+            <div className="mt-4 p-3 rounded-md bg-background/50 border border-border">
+              <h3 className="text-xs text-muted-foreground mb-2 text-center font-medium">Mechanical Properties</h3>
+              <MechanicalPropertiesCard data={mechanicalDatabase[element.number]} />
+            </div>
+          </>
+        )}
+
+        {/* Ellingham Diagram */}
+        {ellinghamReactions.some(r => r.elementNumber === element.number) && (
+          <div className="mt-4 p-3 rounded-md bg-background/50 border border-border">
+            <h3 className="text-xs text-muted-foreground mb-2 text-center font-medium">Ellingham Diagram</h3>
+            <EllinghamDiagram highlightElement={element.number} />
+          </div>
+        )}
+
+        {/* TTT Diagram (for Fe / steel-relevant) */}
+        {element.number === 26 && (
+          <div className="mt-4 p-3 rounded-md bg-background/50 border border-border">
+            <h3 className="text-xs text-muted-foreground mb-2 text-center font-medium">TTT Diagrams (Steel Alloys)</h3>
+            <TTTDiagramViewer />
+          </div>
+        )}
 
         {/* DFT Properties */}
         {dftDatabase[element.number] && (
