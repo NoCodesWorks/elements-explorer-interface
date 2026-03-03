@@ -2,6 +2,8 @@ import type { Element } from "@/data/elements";
 import { categoryLabels, getPhase } from "@/data/elements";
 import { dftDatabase, phaseDiagrams } from "@/data/dftData";
 import { ElectronShellDiagram } from "@/components/ElectronShellDiagram";
+import { SubshellDiagram } from "@/components/SubshellDiagram";
+import { EnergyBandDiagram } from "@/components/EnergyBandDiagram";
 import { DftProperties } from "@/components/DftProperties";
 import { MPProperties } from "@/components/MPProperties";
 import { PhaseDiagram } from "@/components/PhaseDiagram";
@@ -72,6 +74,18 @@ export function ElementDetail({ element, onClose, temperature }: ElementDetailPr
         <div className="mt-4 p-3 rounded-md bg-background/50 border border-border">
           <h3 className="text-xs text-muted-foreground mb-2 text-center font-medium">Electron Shell Diagram</h3>
           <ElectronShellDiagram element={element} />
+        </div>
+
+        {/* Subshell Orbital Diagram */}
+        <div className="mt-4 p-3 rounded-md bg-background/50 border border-border">
+          <h3 className="text-xs text-muted-foreground mb-2 text-center font-medium">Subshell Orbital Filling</h3>
+          <SubshellDiagram element={element} />
+        </div>
+
+        {/* Energy Band Diagram */}
+        <div className="mt-4 p-3 rounded-md bg-background/50 border border-border">
+          <h3 className="text-xs text-muted-foreground mb-2 text-center font-medium">Energy Level Diagram</h3>
+          <EnergyBandDiagram element={element} />
         </div>
 
         {/* Properties Grid */}
