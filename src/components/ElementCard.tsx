@@ -30,11 +30,13 @@ interface ElementCardProps {
   onHover: (cat: ElementCategory | null) => void;
   onClick: (el: Element) => void;
   temperature: number;
+  selectionIndex?: number; // 1 or 2 if selected in binary mode, undefined otherwise
 }
 
-export function ElementCard({ element, highlighted, onHover, onClick, temperature }: ElementCardProps) {
+export function ElementCard({ element, highlighted, onHover, onClick, temperature, selectionIndex }: ElementCardProps) {
   const isDimmed = highlighted !== null && highlighted !== element.category;
   const phase = getPhase(element, temperature);
+  const isSelected = selectionIndex !== undefined;
 
   return (
     <button
@@ -45,6 +47,7 @@ export function ElementCard({ element, highlighted, onHover, onClick, temperatur
         w-full aspect-square min-w-0
         ${categoryColorMap[element.category]}
         ${isDimmed ? dimmedClass : ""}
+        ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : ""}
       `}
       style={{
         gridRow: element.row,
@@ -54,6 +57,12 @@ export function ElementCard({ element, highlighted, onHover, onClick, temperatur
       onMouseLeave={() => onHover(null)}
       onClick={() => onClick(element)}
     >
+      {/* Selection badge */}
+      {isSelected && (
+        <span className="absolute -top-1 -left-1 w-3.5 h-3.5 rounded-full bg-primary text-primary-foreground text-[0.45rem] font-bold flex items-center justify-center z-10">
+          {selectionIndex}
+        </span>
+      )}
       {/* Phase indicator dot */}
       <span className={`absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full ${phaseIndicator[phase]}`} />
       <span className="text-[0.45rem] leading-none text-muted-foreground font-mono-code">
