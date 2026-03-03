@@ -2,3 +2,6 @@ project_id = "bdrstnmcojglrannbmey"
 
 [functions.materials-project]
 verify_jwt = false
+
+[functions.binary-simulation]
+verify_jwt = false

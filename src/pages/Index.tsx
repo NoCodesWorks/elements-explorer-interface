@@ -6,8 +6,12 @@ import { ElementDetail } from "@/components/ElementDetail";
 import { Legend } from "@/components/Legend";
 import { TemperatureSlider } from "@/components/TemperatureSlider";
 import { BinaryPhaseDiagram } from "@/components/BinaryPhaseDiagram";
-import { getBinaryDiagram, getAvailableSystems } from "@/data/binaryPhaseDiagrams";
-import { FlaskConical, X } from "lucide-react";
+import type { SimulationResult } from "@/components/BinaryPhaseDiagram";
+import { SimulationLoader } from "@/components/SimulationLoader";
+import { getBinaryDiagram } from "@/data/binaryPhaseDiagrams";
+import { FlaskConical } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Index = () => {
   const [highlighted, setHighlighted] = useState<ElementCategory | null>(null);
@@ -19,6 +23,8 @@ const Index = () => {
   const [binarySelection, setBinarySelection] = useState<[Element | null, Element | null]>([null, null]);
   const [binaryDiagramOpen, setBinaryDiagramOpen] = useState(false);
   const [binaryError, setBinaryError] = useState<string | null>(null);
+  const [simulating, setSimulating] = useState(false);
+  const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
 
   const handleElementClick = useCallback(
     (el: Element) => {
@@ -69,6 +75,31 @@ const Index = () => {
       return;
     }
     setBinaryError(null);
+    setSimulationResult(null);
+    setSimulating(true);
+
+    // Fire the backend simulation request in parallel with the loading animation
+    supabase.functions
+      .invoke("binary-simulation", {
+        body: {
+          elementA: binarySelection[0].number,
+          elementB: binarySelection[1].number,
+          symbolA: binarySelection[0].symbol,
+          symbolB: binarySelection[1].symbol,
+        },
+      })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Simulation error:", error);
+          toast.error("Backend simulation failed — showing CALPHAD data only");
+        } else if (data) {
+          setSimulationResult(data as SimulationResult);
+        }
+      });
+  };
+
+  const handleSimulationComplete = () => {
+    setSimulating(false);
     setBinaryDiagramOpen(true);
   };
 
@@ -197,8 +228,19 @@ const Index = () => {
 
       {!binaryMode && selected && <ElementDetail element={selected} onClose={() => setSelected(null)} temperature={temperature} />}
 
+      {simulating && binarySelection[0] && binarySelection[1] && (
+        <SimulationLoader
+          systemName={`${binarySelection[0].symbol}–${binarySelection[1].symbol}`}
+          onComplete={handleSimulationComplete}
+        />
+      )}
+
       {binaryDiagramOpen && binaryDiagramData && (
-        <BinaryPhaseDiagram data={binaryDiagramData} onClose={() => setBinaryDiagramOpen(false)} />
+        <BinaryPhaseDiagram
+          data={binaryDiagramData}
+          onClose={() => setBinaryDiagramOpen(false)}
+          simulationResult={simulationResult}
+        />
       )}
     </div>
   );

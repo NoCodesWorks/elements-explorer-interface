@@ -22,12 +22,31 @@ function findZone(x: number, T: number, zones: PhaseZone[]): PhaseZone | null {
   return null;
 }
 
+export interface SimulationResult {
+  system: string;
+  compounds: {
+    formula: string;
+    materialId: string;
+    formationEnergy: number | null;
+    energyAboveHull: number | null;
+    bandGap: number | null;
+    isMetal: boolean | null;
+    density: number | null;
+    spaceGroup: string | null;
+    bulkModulus: number | null;
+    shearModulus: number | null;
+  }[];
+  aiAnalysis: string | null;
+  timestamp: string;
+}
+
 interface BinaryPhaseDiagramProps {
   data: BinaryPhaseDiagramData;
   onClose: () => void;
+  simulationResult?: SimulationResult | null;
 }
 
-export function BinaryPhaseDiagram({ data, onClose }: BinaryPhaseDiagramProps) {
+export function BinaryPhaseDiagram({ data, onClose, simulationResult }: BinaryPhaseDiagramProps) {
   const [hoveredZone, setHoveredZone] = useState<PhaseZone | null>(null);
   const [cursorPos, setCursorPos] = useState<{ x: number; T: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -317,6 +336,44 @@ export function BinaryPhaseDiagram({ data, onClose }: BinaryPhaseDiagramProps) {
                 {inv.description}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Materials Project compounds */}
+        {simulationResult && simulationResult.compounds.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-border">
+            <h3 className="text-xs font-medium text-muted-foreground mb-1.5">
+              Materials Project Compounds ({simulationResult.compounds.length})
+            </h3>
+            <div className="max-h-[120px] overflow-y-auto space-y-1">
+              {simulationResult.compounds
+                .filter((c) => c.energyAboveHull !== null && c.energyAboveHull <= 0.05)
+                .slice(0, 8)
+                .map((c) => (
+                  <div key={c.materialId} className="text-[0.6rem] font-mono-code text-foreground flex items-center gap-2 flex-wrap">
+                    <span className="font-medium">{c.formula}</span>
+                    {c.formationEnergy != null && (
+                      <span className="text-muted-foreground">ΔHf={c.formationEnergy.toFixed(3)} eV/atom</span>
+                    )}
+                    {c.spaceGroup && <span className="text-muted-foreground">{c.spaceGroup}</span>}
+                    {c.isMetal != null && (
+                      <span className={`text-[0.55rem] px-1 rounded ${c.isMetal ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>
+                        {c.isMetal ? "metal" : "non-metal"}
+                      </span>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* AI Phase Analysis */}
+        {simulationResult?.aiAnalysis && (
+          <div className="mt-3 pt-3 border-t border-border">
+            <h3 className="text-xs font-medium text-muted-foreground mb-1.5">AI Phase Analysis</h3>
+            <div className="text-[0.65rem] text-foreground/90 leading-relaxed prose prose-invert prose-xs max-w-none whitespace-pre-wrap">
+              {simulationResult.aiAnalysis}
+            </div>
           </div>
         )}
       </div>
