@@ -26,6 +26,13 @@ export interface InvariantReaction {
   description: string;
 }
 
+export interface PhaseZone {
+  name: string;
+  color: string;
+  // Polygon vertices as [x, T] pairs defining the zone boundary
+  polygon: [number, number][];
+}
+
 export interface BinaryPhaseDiagramData {
   systemName: string;
   elementA: string;
@@ -35,6 +42,7 @@ export interface BinaryPhaseDiagramData {
   boundaries: BinaryBoundary[];
   regions: BinaryPhaseRegion[];
   invariants: InvariantReaction[];
+  zones: PhaseZone[];
   notes: string;
 }
 
@@ -61,6 +69,10 @@ export function getBinaryDiagram(a: number, b: number): BinaryPhaseDiagramData |
         points: bd.points.map((p) => ({ ...p, x: 1 - p.x })),
       })),
       invariants: diagram.invariants.map((inv) => ({ ...inv, x: 1 - inv.x })),
+      zones: diagram.zones.map((z) => ({
+        ...z,
+        polygon: z.polygon.map(([x, T]) => [1 - x, T] as [number, number]),
+      })),
     };
   }
   return diagram;
@@ -157,9 +169,15 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
       { label: "Eutectoid", type: "eutectoid", T: 727, x: 0.034, description: "γ → α + Fe₃C (Pearlite)" },
       { label: "Peritectic", type: "peritectic", T: 1768, x: 0.02, description: "L + δ → γ" },
     ],
+    zones: [
+      { name: "Liquid", color: "hsl(25, 80%, 55%)", polygon: [[0, 1811], [0.01, 1800], [0.02, 1780], [0.04, 1750], [0.08, 1700], [0.10, 1650], [0.15, 1550], [0.17, 1420], [0.20, 1500], [0.25, 1700], [0.25, 2100], [0, 2100]] },
+      { name: "δ-Fe", color: "hsl(270, 55%, 60%)", polygon: [[0, 1811], [0.003, 1800], [0.005, 1768], [0.02, 1768], [0.01, 1750], [0.005, 1700], [0, 1668], [0, 1811]] },
+      { name: "γ-Fe (Austenite)", color: "hsl(45, 70%, 50%)", polygon: [[0, 1668], [0.005, 1700], [0.01, 1750], [0.02, 1768], [0.04, 1750], [0.08, 1700], [0.10, 1650], [0.15, 1550], [0.17, 1420], [0.08, 1420], [0.04, 1350], [0.02, 1250], [0.01, 1200], [0, 1185]] },
+      { name: "α-Fe (Ferrite)", color: "hsl(200, 80%, 55%)", polygon: [[0, 1185], [0.001, 1100], [0.002, 1000], [0.003, 900], [0.004, 800], [0.005, 727], [0, 727], [0, 300], [0, 300]] },
+      { name: "α + Fe₃C", color: "hsl(350, 70%, 55%)", polygon: [[0.005, 727], [0.034, 727], [0.25, 727], [0.25, 300], [0, 300], [0, 727], [0.005, 727]] },
+      { name: "γ + Fe₃C", color: "hsl(320, 50%, 45%)", polygon: [[0.08, 1420], [0.17, 1420], [0.25, 1420], [0.25, 727], [0.034, 727], [0.04, 1350], [0.08, 1420]] },
+    ],
   },
-
-  // Cu-Zn (Copper-Zinc / Brass)
   "29-30": {
     systemName: "Cu–Zn",
     elementA: "Cu",
@@ -213,9 +231,13 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
       { label: "Peritectic", type: "peritectic", T: 1175, x: 0.37, description: "L + α → β" },
       { label: "Peritectic", type: "peritectic", T: 970, x: 0.60, description: "L + β → γ" },
     ],
+    zones: [
+      { name: "Liquid", color: "hsl(25, 80%, 55%)", polygon: [[0, 1358], [0.1, 1300], [0.2, 1230], [0.3, 1170], [0.35, 1180], [0.4, 1150], [0.5, 1100], [0.6, 970], [0.7, 870], [0.8, 800], [0.9, 750], [1.0, 693], [1.0, 1500], [0, 1500]] },
+      { name: "α (FCC Cu)", color: "hsl(200, 80%, 55%)", polygon: [[0, 1358], [0.32, 1230], [0.35, 1100], [0.37, 900], [0.38, 700], [0.39, 500], [0.39, 300], [0, 300], [0, 1358]] },
+      { name: "β (BCC)", color: "hsl(45, 70%, 50%)", polygon: [[0.37, 1230], [0.40, 1100], [0.45, 900], [0.48, 700], [0.50, 500], [0.50, 300], [0.39, 300], [0.39, 500], [0.38, 700], [0.37, 900], [0.35, 1100], [0.32, 1230]] },
+      { name: "γ (Complex cubic)", color: "hsl(140, 60%, 50%)", polygon: [[0.58, 970], [0.60, 900], [0.63, 800], [0.65, 700], [0.67, 500], [0.67, 300], [0.50, 300], [0.50, 500], [0.48, 700], [0.45, 900], [0.40, 1100], [0.5, 1100], [0.58, 970]] },
+    ],
   },
-
-  // Al-Cu (Aluminium-Copper)
   "13-29": {
     systemName: "Al–Cu",
     elementA: "Al",
@@ -265,9 +287,13 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     invariants: [
       { label: "Eutectic", type: "eutectic", T: 821, x: 0.17, description: "L → α + θ (Al₂Cu)" },
     ],
+    zones: [
+      { name: "Liquid", color: "hsl(25, 80%, 55%)", polygon: [[0, 933], [0.05, 920], [0.10, 890], [0.15, 850], [0.17, 821], [0.25, 900], [0.33, 1050], [0.50, 1200], [0.75, 1300], [1.0, 1358], [1.0, 1500], [0, 1500]] },
+      { name: "α (FCC Al)", color: "hsl(200, 80%, 55%)", polygon: [[0, 933], [0.025, 821], [0.02, 700], [0.015, 600], [0.01, 500], [0.005, 400], [0.002, 300], [0, 300]] },
+      { name: "α + θ", color: "hsl(45, 70%, 50%)", polygon: [[0.025, 821], [0.17, 821], [0.33, 821], [0.33, 300], [0.002, 300], [0.005, 400], [0.01, 500], [0.015, 600], [0.02, 700], [0.025, 821]] },
+      { name: "θ (Al₂Cu) + Liquid", color: "hsl(350, 70%, 55%)", polygon: [[0.17, 821], [0.25, 900], [0.33, 1050], [0.33, 821]] },
+    ],
   },
-
-  // Ti-Al (Titanium-Aluminium)
   "13-22": {
     systemName: "Ti–Al",
     elementA: "Ti",
@@ -321,9 +347,14 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     invariants: [
       { label: "Peritectic", type: "peritectic", T: 1730, x: 0.50, description: "L + β → γ-TiAl" },
     ],
+    zones: [
+      { name: "Liquid", color: "hsl(25, 80%, 55%)", polygon: [[0, 1941], [0.1, 1900], [0.2, 1850], [0.3, 1800], [0.4, 1750], [0.5, 1730], [0.6, 1700], [0.7, 1600], [0.8, 1400], [0.9, 1100], [1.0, 933], [1.0, 2100], [0, 2100]] },
+      { name: "β-Ti (BCC)", color: "hsl(270, 55%, 60%)", polygon: [[0, 1941], [0, 1155], [0.05, 1180], [0.10, 1200], [0.15, 1250], [0.20, 1300], [0.25, 1350], [0.3, 1800], [0.2, 1850], [0.1, 1900]] },
+      { name: "α-Ti (HCP)", color: "hsl(200, 80%, 55%)", polygon: [[0, 1155], [0, 300], [0.22, 300], [0.22, 1450], [0.25, 1350], [0.20, 1300], [0.15, 1250], [0.10, 1200], [0.05, 1180]] },
+      { name: "α₂ (Ti₃Al)", color: "hsl(140, 60%, 50%)", polygon: [[0.22, 1450], [0.25, 1350], [0.28, 1250], [0.30, 1180], [0.33, 1100], [0.33, 300], [0.22, 300]] },
+      { name: "γ (TiAl)", color: "hsl(45, 70%, 50%)", polygon: [[0.35, 1450], [0.40, 1400], [0.48, 1440], [0.50, 1730], [0.50, 300], [0.33, 300], [0.33, 1100], [0.35, 1450]] },
+    ],
   },
-
-  // Ni-Al (Nickel-Aluminium)
   "13-28": {
     systemName: "Ni–Al",
     elementA: "Ni",
@@ -367,9 +398,13 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     invariants: [
       { label: "Eutectic", type: "eutectic", T: 1638, x: 0.25, description: "L → γ + γ' (Ni₃Al)" },
     ],
+    zones: [
+      { name: "Liquid", color: "hsl(25, 80%, 55%)", polygon: [[0, 1728], [0.1, 1680], [0.15, 1640], [0.25, 1638], [0.35, 1700], [0.50, 1911], [0.60, 1800], [0.75, 1400], [1.0, 933], [1.0, 2100], [0, 2100]] },
+      { name: "γ (FCC Ni)", color: "hsl(200, 80%, 55%)", polygon: [[0, 1728], [0, 300], [0.14, 300], [0.14, 1638], [0.1, 1680]] },
+      { name: "γ' (Ni₃Al)", color: "hsl(45, 70%, 50%)", polygon: [[0.14, 1638], [0.18, 1500], [0.22, 1350], [0.25, 1200], [0.25, 300], [0.14, 300]] },
+      { name: "β (NiAl)", color: "hsl(140, 60%, 50%)", polygon: [[0.35, 1700], [0.40, 1600], [0.50, 1911], [0.60, 1800], [0.58, 1400], [0.58, 300], [0.25, 300], [0.25, 1200], [0.35, 1700]] },
+    ],
   },
-
-  // Pb-Sn (Lead-Tin / Solder)
   "50-82": {
     systemName: "Pb–Sn",
     elementA: "Pb",
@@ -428,9 +463,13 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     invariants: [
       { label: "Eutectic", type: "eutectic", T: 456, x: 0.38, description: "L → α + β (61.9% Sn)" },
     ],
+    zones: [
+      { name: "Liquid", color: "hsl(25, 80%, 55%)", polygon: [[0, 600], [0.1, 580], [0.2, 550], [0.3, 510], [0.38, 456], [0.5, 470], [0.6, 480], [0.7, 490], [0.8, 495], [0.9, 500], [1.0, 505], [1.0, 700], [0, 700]] },
+      { name: "α (FCC Pb)", color: "hsl(200, 80%, 55%)", polygon: [[0, 600], [0.02, 456], [0.015, 400], [0.01, 350], [0.005, 300], [0, 300]] },
+      { name: "α + β", color: "hsl(180, 50%, 45%)", polygon: [[0.02, 456], [0.38, 456], [0.97, 456], [0.985, 300], [0.005, 300], [0.01, 350], [0.015, 400]] },
+      { name: "β (BCT Sn)", color: "hsl(45, 70%, 50%)", polygon: [[1.0, 505], [0.97, 456], [0.975, 400], [0.98, 350], [0.985, 300], [1.0, 300]] },
+    ],
   },
-
-  // Si-Ge (Silicon-Germanium)
   "14-32": {
     systemName: "Si–Ge",
     elementA: "Si",
@@ -465,9 +504,12 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
       },
     ],
     invariants: [],
+    zones: [
+      { name: "Liquid", color: "hsl(25, 80%, 55%)", polygon: [[0, 1687], [0.1, 1620], [0.2, 1560], [0.3, 1500], [0.4, 1450], [0.5, 1400], [0.6, 1350], [0.7, 1300], [0.8, 1260], [0.9, 1230], [1.0, 1211], [1.0, 1800], [0, 1800]] },
+      { name: "Solid + Liquid", color: "hsl(180, 50%, 45%)", polygon: [[0, 1687], [0.1, 1620], [0.2, 1560], [0.3, 1500], [0.4, 1450], [0.5, 1400], [0.6, 1350], [0.7, 1300], [0.8, 1260], [0.9, 1230], [1.0, 1211], [1.0, 1211], [0.9, 1225], [0.8, 1240], [0.7, 1260], [0.6, 1285], [0.5, 1320], [0.4, 1360], [0.3, 1410], [0.2, 1480], [0.1, 1570], [0, 1687]] },
+      { name: "Solid solution (Diamond)", color: "hsl(200, 80%, 55%)", polygon: [[0, 1687], [0.1, 1570], [0.2, 1480], [0.3, 1410], [0.4, 1360], [0.5, 1320], [0.6, 1285], [0.7, 1260], [0.8, 1240], [0.9, 1225], [1.0, 1211], [1.0, 1000], [0, 1000]] },
+    ],
   },
-
-  // Au-Cu (Gold-Copper)
   "29-79": {
     systemName: "Au–Cu",
     elementA: "Cu",
@@ -521,6 +563,13 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     ],
     invariants: [
       { label: "Minimum", type: "congruent", T: 1100, x: 0.50, description: "Solidus minimum at Au₅₀Cu₅₀" },
+    ],
+    zones: [
+      { name: "Liquid", color: "hsl(25, 80%, 55%)", polygon: [[0, 1358], [0.1, 1300], [0.2, 1240], [0.3, 1190], [0.4, 1160], [0.5, 1150], [0.6, 1160], [0.7, 1190], [0.8, 1230], [0.9, 1280], [1.0, 1337], [1.0, 1500], [0, 1500]] },
+      { name: "Solid + Liquid", color: "hsl(180, 50%, 45%)", polygon: [[0, 1358], [0.1, 1300], [0.2, 1240], [0.3, 1190], [0.4, 1160], [0.5, 1150], [0.6, 1160], [0.7, 1190], [0.8, 1230], [0.9, 1280], [1.0, 1337], [1.0, 1337], [0.9, 1240], [0.8, 1180], [0.7, 1140], [0.6, 1110], [0.5, 1100], [0.4, 1120], [0.3, 1150], [0.2, 1200], [0.1, 1270], [0, 1358]] },
+      { name: "FCC solid solution", color: "hsl(200, 80%, 55%)", polygon: [[0, 1358], [0.1, 1270], [0.2, 1200], [0.3, 1150], [0.4, 1120], [0.5, 1100], [0.6, 1110], [0.7, 1140], [0.8, 1180], [0.9, 1240], [1.0, 1337], [1.0, 400], [0, 400]] },
+      { name: "AuCu₃ (L1₂)", color: "hsl(140, 60%, 50%)", polygon: [[0.20, 523], [0.25, 663], [0.30, 523], [0.30, 400], [0.20, 400]] },
+      { name: "AuCu (L1₀)", color: "hsl(45, 70%, 50%)", polygon: [[0.40, 583], [0.50, 683], [0.60, 583], [0.60, 400], [0.40, 400]] },
     ],
   },
 };

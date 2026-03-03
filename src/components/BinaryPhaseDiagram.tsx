@@ -1,6 +1,27 @@
+import { useState, useCallback, useRef } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceDot } from "recharts";
 import { X } from "lucide-react";
-import type { BinaryPhaseDiagramData } from "@/data/binaryPhaseDiagrams";
+import type { BinaryPhaseDiagramData, PhaseZone } from "@/data/binaryPhaseDiagrams";
+
+// Point-in-polygon using ray casting
+function pointInPolygon(x: number, y: number, polygon: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function findZone(x: number, T: number, zones: PhaseZone[]): PhaseZone | null {
+  for (const zone of zones) {
+    if (pointInPolygon(x, T, zone.polygon)) return zone;
+  }
+  return null;
+}
 
 interface BinaryPhaseDiagramProps {
   data: BinaryPhaseDiagramData;
@@ -8,6 +29,75 @@ interface BinaryPhaseDiagramProps {
 }
 
 export function BinaryPhaseDiagram({ data, onClose }: BinaryPhaseDiagramProps) {
+  const [hoveredZone, setHoveredZone] = useState<PhaseZone | null>(null);
+  const [cursorPos, setCursorPos] = useState<{ x: number; T: number } | null>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = useCallback(
+    (state: any) => {
+      if (!state?.activePayload && !state?.chartX) {
+        // Try using the Recharts event coordinates
+        if (state && state.xValue !== undefined && state.yValue !== undefined) {
+          const zone = findZone(state.xValue, state.yValue, data.zones);
+          setHoveredZone(zone);
+          setCursorPos({ x: state.xValue, T: state.yValue });
+        }
+        return;
+      }
+      // Recharts mouse event — extract coordinates from active coordinate
+      if (state?.activeCoordinate) {
+        // We need to reverse-map pixel coordinates to data coordinates
+        // Use the chart's internal scale
+      }
+    },
+    [data.zones],
+  );
+
+  // Custom overlay for mouse tracking
+  const handleChartMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const chartEl = chartRef.current;
+      if (!chartEl) return;
+
+      // Find the recharts chart area
+      const svg = chartEl.querySelector("svg");
+      if (!svg) return;
+      const clipRect = svg.querySelector(".recharts-cartesian-grid");
+      if (!clipRect) return;
+
+      const gridRect = clipRect.getBoundingClientRect();
+      const mouseX = e.clientX - gridRect.left;
+      const mouseY = e.clientY - gridRect.top;
+
+      if (mouseX < 0 || mouseX > gridRect.width || mouseY < 0 || mouseY > gridRect.height) {
+        setHoveredZone(null);
+        setCursorPos(null);
+        return;
+      }
+
+      // Map pixel to data coordinates
+      // X axis: 0 to 1 (composition)
+      const xData = mouseX / gridRect.width;
+      
+      // Y axis: need to find the T range from data
+      const allT = data.boundaries.flatMap((b) => b.points.map((p) => p.T));
+      const minT = Math.min(...allT) - 50;
+      const maxT = Math.max(...allT) + 50;
+      // Y is inverted (top = maxT, bottom = minT)
+      const tData = maxT - (mouseY / gridRect.height) * (maxT - minT);
+
+      const zone = findZone(xData, tData, data.zones);
+      setHoveredZone(zone);
+      setCursorPos({ x: xData, T: Math.round(tData) });
+    },
+    [data],
+  );
+
+  const handleChartMouseLeave = useCallback(() => {
+    setHoveredZone(null);
+    setCursorPos(null);
+  }, []);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" onClick={onClose}>
       <div
@@ -23,8 +113,30 @@ export function BinaryPhaseDiagram({ data, onClose }: BinaryPhaseDiagramProps) {
         </h2>
         <p className="text-xs text-muted-foreground mt-0.5">at 1 atm — {data.notes}</p>
 
+        {/* Hover zone indicator */}
+        <div className="h-6 mt-2 flex items-center gap-2">
+          {hoveredZone ? (
+            <div className="flex items-center gap-2 text-xs animate-in fade-in duration-150">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: hoveredZone.color }} />
+              <span className="font-medium text-foreground">{hoveredZone.name}</span>
+              {cursorPos && (
+                <span className="text-muted-foreground font-mono-code text-[0.65rem]">
+                  ({(cursorPos.x * 100).toFixed(1)}% {data.elementB}, {cursorPos.T} K)
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-[0.65rem] text-muted-foreground italic">Hover over the chart to identify phase regions</span>
+          )}
+        </div>
+
         {/* Chart */}
-        <div className="h-72 w-full mt-4">
+        <div
+          ref={chartRef}
+          className="h-72 w-full mt-1 cursor-crosshair"
+          onMouseMove={handleChartMouseMove}
+          onMouseLeave={handleChartMouseLeave}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <LineChart margin={{ top: 10, right: 15, bottom: 25, left: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 20%)" />
