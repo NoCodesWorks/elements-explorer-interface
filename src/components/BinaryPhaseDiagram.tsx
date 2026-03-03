@@ -1,7 +1,6 @@
-import { useState, useCallback, useRef } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceDot } from "recharts";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { X } from "lucide-react";
-import type { BinaryPhaseDiagramData, PhaseZone } from "@/data/binaryPhaseDiagrams";
+import type { BinaryPhaseDiagramData, PhaseZone, BinaryBoundary } from "@/data/binaryPhaseDiagrams";
 
 // Point-in-polygon using ray casting
 function pointInPolygon(x: number, y: number, polygon: [number, number][]): boolean {
@@ -31,77 +30,99 @@ interface BinaryPhaseDiagramProps {
 export function BinaryPhaseDiagram({ data, onClose }: BinaryPhaseDiagramProps) {
   const [hoveredZone, setHoveredZone] = useState<PhaseZone | null>(null);
   const [cursorPos, setCursorPos] = useState<{ x: number; T: number } | null>(null);
-  const chartRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
-  const handleMouseMove = useCallback(
-    (state: any) => {
-      if (!state?.activePayload && !state?.chartX) {
-        // Try using the Recharts event coordinates
-        if (state && state.xValue !== undefined && state.yValue !== undefined) {
-          const zone = findZone(state.xValue, state.yValue, data.zones);
-          setHoveredZone(zone);
-          setCursorPos({ x: state.xValue, T: state.yValue });
-        }
-        return;
-      }
-      // Recharts mouse event — extract coordinates from active coordinate
-      if (state?.activeCoordinate) {
-        // We need to reverse-map pixel coordinates to data coordinates
-        // Use the chart's internal scale
-      }
-    },
-    [data.zones],
+  // Chart layout constants
+  const width = 520;
+  const height = 340;
+  const margin = { top: 20, right: 20, bottom: 40, left: 55 };
+  const plotW = width - margin.left - margin.right;
+  const plotH = height - margin.top - margin.bottom;
+
+  // Compute T range from data
+  const { minT, maxT } = useMemo(() => {
+    const allT = [
+      ...data.boundaries.flatMap((b) => b.points.map((p) => p.T)),
+      ...data.zones.flatMap((z) => z.polygon.map(([, T]) => T)),
+    ];
+    const lo = Math.min(...allT);
+    const hi = Math.max(...allT);
+    // Round to nice values
+    return { minT: Math.floor(lo / 50) * 50 - 50, maxT: Math.ceil(hi / 50) * 50 + 50 };
+  }, [data]);
+
+  // Map data coords to SVG pixel coords
+  const xScale = useCallback((v: number) => margin.left + v * plotW, [plotW]);
+  const yScale = useCallback((T: number) => margin.top + plotH - ((T - minT) / (maxT - minT)) * plotH, [plotH, minT, maxT]);
+
+  // Reverse map
+  const xInv = useCallback((px: number) => (px - margin.left) / plotW, [plotW]);
+  const yInv = useCallback((py: number) => maxT - ((py - margin.top) / plotH) * (maxT - minT), [plotH, minT, maxT]);
+
+  // Build SVG path for a polygon
+  const polygonPath = useCallback(
+    (polygon: [number, number][]) =>
+      polygon.map(([x, T], i) => `${i === 0 ? "M" : "L"}${xScale(x)},${yScale(T)}`).join(" ") + " Z",
+    [xScale, yScale],
   );
 
-  // Custom overlay for mouse tracking
-  const handleChartMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const chartEl = chartRef.current;
-      if (!chartEl) return;
+  // Build SVG path for a boundary
+  const boundaryPath = useCallback(
+    (b: BinaryBoundary) =>
+      b.points.map((p, i) => `${i === 0 ? "M" : "L"}${xScale(p.x)},${yScale(p.T)}`).join(" "),
+    [xScale, yScale],
+  );
 
-      // Find the recharts chart area
-      const svg = chartEl.querySelector("svg");
+  // Centroid of polygon for label placement
+  const centroid = useCallback(
+    (polygon: [number, number][]): [number, number] => {
+      // Clip polygon to visible area
+      const clipped = polygon.map(([x, T]) => [
+        Math.max(0, Math.min(1, x)),
+        Math.max(minT, Math.min(maxT, T)),
+      ] as [number, number]);
+      const cx = clipped.reduce((s, [x]) => s + x, 0) / clipped.length;
+      const cT = clipped.reduce((s, [, T]) => s + T, 0) / clipped.length;
+      return [xScale(cx), yScale(cT)];
+    },
+    [xScale, yScale, minT, maxT],
+  );
+
+  // Axis ticks
+  const xTicks = [0, 0.2, 0.4, 0.6, 0.8, 1.0];
+  const yTickCount = 8;
+  const yTicks = useMemo(() => {
+    const step = Math.round((maxT - minT) / yTickCount / 50) * 50;
+    const ticks: number[] = [];
+    for (let t = Math.ceil(minT / step) * step; t <= maxT; t += step) ticks.push(t);
+    return ticks;
+  }, [minT, maxT]);
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
+      const svg = svgRef.current;
       if (!svg) return;
-      const clipRect = svg.querySelector(".recharts-cartesian-grid");
-      if (!clipRect) return;
-
-      const gridRect = clipRect.getBoundingClientRect();
-      const mouseX = e.clientX - gridRect.left;
-      const mouseY = e.clientY - gridRect.top;
-
-      if (mouseX < 0 || mouseX > gridRect.width || mouseY < 0 || mouseY > gridRect.height) {
+      const rect = svg.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      if (px < margin.left || px > margin.left + plotW || py < margin.top || py > margin.top + plotH) {
         setHoveredZone(null);
         setCursorPos(null);
         return;
       }
-
-      // Map pixel to data coordinates
-      // X axis: 0 to 1 (composition)
-      const xData = mouseX / gridRect.width;
-      
-      // Y axis: need to find the T range from data
-      const allT = data.boundaries.flatMap((b) => b.points.map((p) => p.T));
-      const minT = Math.min(...allT) - 50;
-      const maxT = Math.max(...allT) + 50;
-      // Y is inverted (top = maxT, bottom = minT)
-      const tData = maxT - (mouseY / gridRect.height) * (maxT - minT);
-
-      const zone = findZone(xData, tData, data.zones);
+      const xVal = xInv(px);
+      const tVal = yInv(py);
+      const zone = findZone(xVal, tVal, data.zones);
       setHoveredZone(zone);
-      setCursorPos({ x: xData, T: Math.round(tData) });
+      setCursorPos({ x: xVal, T: Math.round(tVal) });
     },
-    [data],
+    [data.zones, xInv, yInv, plotW, plotH],
   );
-
-  const handleChartMouseLeave = useCallback(() => {
-    setHoveredZone(null);
-    setCursorPos(null);
-  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="relative bg-card border border-border rounded-lg p-6 w-[560px] shadow-2xl max-h-[90vh] overflow-y-auto"
+        className="relative bg-card border border-border rounded-lg p-6 w-[600px] shadow-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <button onClick={onClose} className="absolute top-3 right-3 text-muted-foreground hover:text-foreground transition-colors">
@@ -130,103 +151,158 @@ export function BinaryPhaseDiagram({ data, onClose }: BinaryPhaseDiagramProps) {
           )}
         </div>
 
-        {/* Chart */}
-        <div
-          ref={chartRef}
-          className="h-72 w-full mt-1 cursor-crosshair"
-          onMouseMove={handleChartMouseMove}
-          onMouseLeave={handleChartMouseLeave}
+        {/* SVG Chart */}
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${width} ${height}`}
+          className="w-full mt-1 cursor-crosshair"
+          onMouseMove={handleMouseMove}
+          onMouseLeave={() => { setHoveredZone(null); setCursorPos(null); }}
         >
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart margin={{ top: 10, right: 15, bottom: 25, left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 20%)" />
-              <XAxis
-                dataKey="x"
-                type="number"
-                domain={[0, 1]}
-                ticks={[0, 0.2, 0.4, 0.6, 0.8, 1.0]}
-                tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
-                label={{
-                  value: `${data.elementA} ← Atomic % ${data.elementB} →`,
-                  position: "insideBottom",
-                  offset: -12,
-                  style: { fill: "hsl(215, 15%, 55%)", fontSize: 10 },
-                }}
-                tick={{ fill: "hsl(215, 15%, 55%)", fontSize: 9 }}
-                stroke="hsl(220, 15%, 20%)"
-              />
-              <YAxis
-                dataKey="T"
-                type="number"
-                label={{
-                  value: "Temperature (K)",
-                  angle: -90,
-                  position: "insideLeft",
-                  offset: 10,
-                  style: { fill: "hsl(215, 15%, 55%)", fontSize: 10 },
-                }}
-                tick={{ fill: "hsl(215, 15%, 55%)", fontSize: 9 }}
-                stroke="hsl(220, 15%, 20%)"
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "hsl(220, 18%, 12%)",
-                  border: "1px solid hsl(220, 15%, 20%)",
-                  borderRadius: 6,
-                  fontSize: 11,
-                  color: "hsl(210, 20%, 92%)",
-                }}
-                formatter={(value: number, name: string) => [`${value} K`, name]}
-                labelFormatter={(label) => `x = ${(Number(label) * 100).toFixed(1)}% ${data.elementB}`}
-              />
-              {data.boundaries.map((boundary) => (
-                <Line
-                  key={boundary.label}
-                  data={boundary.points}
-                  dataKey="T"
-                  name={boundary.label}
-                  stroke={boundary.color}
-                  strokeWidth={2}
-                  strokeDasharray={boundary.dashed ? "5 3" : undefined}
-                  dot={false}
-                  type="monotone"
-                />
-              ))}
-              {data.invariants.map((inv) => (
-                <ReferenceDot
-                  key={inv.label + inv.x}
-                  x={inv.x}
-                  y={inv.T}
-                  r={4}
-                  fill={
-                    inv.type === "eutectic" ? "hsl(350, 70%, 55%)" :
-                    inv.type === "eutectoid" ? "hsl(270, 55%, 60%)" :
-                    inv.type === "peritectic" ? "hsl(45, 70%, 50%)" :
-                    "hsl(200, 80%, 55%)"
-                  }
-                  stroke="none"
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+          {/* Clip path for plot area */}
+          <defs>
+            <clipPath id="plotClip">
+              <rect x={margin.left} y={margin.top} width={plotW} height={plotH} />
+            </clipPath>
+          </defs>
 
-        {/* Phase regions */}
+          {/* Background */}
+          <rect x={margin.left} y={margin.top} width={plotW} height={plotH} fill="hsl(220, 18%, 10%)" />
+
+          {/* Filled phase zones */}
+          <g clipPath="url(#plotClip)">
+            {data.zones.map((zone) => (
+              <path
+                key={zone.name}
+                d={polygonPath(zone.polygon)}
+                fill={zone.color}
+                fillOpacity={0.25}
+                stroke="none"
+              />
+            ))}
+          </g>
+
+          {/* Grid lines */}
+          <g>
+            {xTicks.map((t) => (
+              <line key={`gx${t}`} x1={xScale(t)} y1={margin.top} x2={xScale(t)} y2={margin.top + plotH} stroke="hsl(220, 15%, 18%)" strokeDasharray="2 3" />
+            ))}
+            {yTicks.map((t) => (
+              <line key={`gy${t}`} x1={margin.left} y1={yScale(t)} x2={margin.left + plotW} y2={yScale(t)} stroke="hsl(220, 15%, 18%)" strokeDasharray="2 3" />
+            ))}
+          </g>
+
+          {/* Phase boundaries */}
+          <g clipPath="url(#plotClip)">
+            {data.boundaries.map((b) => (
+              <path
+                key={b.label}
+                d={boundaryPath(b)}
+                fill="none"
+                stroke={b.color}
+                strokeWidth={2}
+                strokeDasharray={b.dashed ? "6 3" : undefined}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ))}
+          </g>
+
+          {/* Invariant points */}
+          {data.invariants.map((inv) => (
+            <g key={inv.label + inv.x}>
+              <circle
+                cx={xScale(inv.x)}
+                cy={yScale(inv.T)}
+                r={4}
+                fill={
+                  inv.type === "eutectic" ? "hsl(350, 70%, 55%)" :
+                  inv.type === "eutectoid" ? "hsl(270, 55%, 60%)" :
+                  inv.type === "peritectic" ? "hsl(45, 70%, 50%)" :
+                  "hsl(200, 80%, 55%)"
+                }
+              />
+              <text
+                x={xScale(inv.x)}
+                y={yScale(inv.T) - 8}
+                textAnchor="middle"
+                fill="hsl(210, 20%, 80%)"
+                fontSize={7}
+                fontFamily="monospace"
+              >
+                {inv.T} K
+              </text>
+            </g>
+          ))}
+
+          {/* Inline phase region labels */}
+          <g clipPath="url(#plotClip)">
+            {data.zones.map((zone) => {
+              const [cx, cy] = centroid(zone.polygon);
+              return (
+                <text
+                  key={`label-${zone.name}`}
+                  x={cx}
+                  y={cy}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill="hsl(210, 20%, 90%)"
+                  fontSize={8}
+                  fontWeight="600"
+                  fontFamily="monospace"
+                  style={{ textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}
+                >
+                  {zone.name}
+                </text>
+              );
+            })}
+          </g>
+
+          {/* X axis */}
+          <line x1={margin.left} y1={margin.top + plotH} x2={margin.left + plotW} y2={margin.top + plotH} stroke="hsl(220, 15%, 30%)" />
+          {xTicks.map((t) => (
+            <g key={`xt${t}`}>
+              <line x1={xScale(t)} y1={margin.top + plotH} x2={xScale(t)} y2={margin.top + plotH + 4} stroke="hsl(220, 15%, 30%)" />
+              <text x={xScale(t)} y={margin.top + plotH + 14} textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize={9}>
+                {(t * 100).toFixed(0)}%
+              </text>
+            </g>
+          ))}
+          <text x={margin.left + plotW / 2} y={height - 4} textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize={10}>
+            {data.elementA} ← Atomic % {data.elementB} →
+          </text>
+
+          {/* Y axis */}
+          <line x1={margin.left} y1={margin.top} x2={margin.left} y2={margin.top + plotH} stroke="hsl(220, 15%, 30%)" />
+          {yTicks.map((t) => (
+            <g key={`yt${t}`}>
+              <line x1={margin.left - 4} y1={yScale(t)} x2={margin.left} y2={yScale(t)} stroke="hsl(220, 15%, 30%)" />
+              <text x={margin.left - 6} y={yScale(t) + 3} textAnchor="end" fill="hsl(215, 15%, 55%)" fontSize={9}>
+                {t}
+              </text>
+            </g>
+          ))}
+          <text
+            x={14}
+            y={margin.top + plotH / 2}
+            textAnchor="middle"
+            fill="hsl(215, 15%, 55%)"
+            fontSize={10}
+            transform={`rotate(-90, 14, ${margin.top + plotH / 2})`}
+          >
+            Temperature (K)
+          </text>
+
+          {/* Plot border */}
+          <rect x={margin.left} y={margin.top} width={plotW} height={plotH} fill="none" stroke="hsl(220, 15%, 30%)" />
+        </svg>
+
+        {/* Phase regions legend */}
         <div className="flex flex-wrap gap-2 mt-3">
           {data.regions.map((r) => (
             <span key={r.name} className="text-[0.6rem] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded flex items-center gap-1">
               <span className="w-2 h-2 rounded-full" style={{ background: r.color }} />
               {r.name}
-            </span>
-          ))}
-        </div>
-
-        {/* Boundary legend */}
-        <div className="flex flex-wrap gap-3 mt-2">
-          {data.boundaries.map((b) => (
-            <span key={b.label} className="text-[0.55rem] text-muted-foreground flex items-center gap-1">
-              <span className="w-3 h-0.5 rounded" style={{ background: b.color, borderStyle: b.dashed ? "dashed" : "solid" }} />
-              {b.label}
             </span>
           ))}
         </div>
