@@ -3,7 +3,9 @@ import { categoryLabels, getPhase } from "@/data/elements";
 import { dftDatabase, phaseDiagrams } from "@/data/dftData";
 import { ElectronShellDiagram } from "@/components/ElectronShellDiagram";
 import { DftProperties } from "@/components/DftProperties";
+import { MPProperties } from "@/components/MPProperties";
 import { PhaseDiagram } from "@/components/PhaseDiagram";
+import { useMaterialsProject, hasMPData } from "@/hooks/useMaterialsProject";
 import { X } from "lucide-react";
 
 const categoryBgMap: Record<string, string> = {
@@ -43,6 +45,7 @@ function PropertyItem({ label, value }: { label: string; value: string | number 
 export function ElementDetail({ element, onClose, temperature }: ElementDetailProps) {
   const phase = getPhase(element, temperature);
   const phaseLabel = phase === "unknown" ? "Unknown" : phase.charAt(0).toUpperCase() + phase.slice(1);
+  const { data: mpData, isLoading: mpLoading, error: mpError } = useMaterialsProject(element.number);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" onClick={onClose}>
@@ -102,6 +105,11 @@ export function ElementDetail({ element, onClose, temperature }: ElementDetailPr
         {/* DFT Properties */}
         {dftDatabase[element.number] && (
           <DftProperties data={dftDatabase[element.number]} />
+        )}
+
+        {/* Materials Project Live Data */}
+        {hasMPData(element.number) && (
+          <MPProperties data={mpData} isLoading={mpLoading} error={mpError} />
         )}
 
         {/* Phase Diagram */}
