@@ -1,118 +1,95 @@
 
 
-## Plan: Smart Scaling, Advanced Computation, and Physical Consistency for Phase Diagrams
+## Plan: Multi-Tier Data Strategy with ML Prediction and Visual Source Badges
 
-This is a significant feature set spanning 5 areas. Here is the implementation plan.
-
----
-
-### 1. Adaptive X-Axis Scaling for Binary Phase Diagrams
-
-**What changes:**
-- Add a `maxComposition` field to `BinaryPhaseDiagramData` interface (optional, defaults to 1.0)
-- For Fe-C system, hardcode `maxComposition: 0.0667` (6.67 at% cementite limit)
-- Add a "Zoom to Region of Interest" slider/toggle in the `BinaryPhaseDiagram` component header
-- Modify `xScale`, `xInv`, x-axis ticks, and zone rendering to use the dynamic max instead of hardcoded 0-1 range
-
-**Files:** `src/data/binaryPhaseDiagrams.ts`, `src/components/BinaryPhaseDiagram.tsx`
+This plan adds a tiered data fallback system, ML-based phase prediction for unknown systems, system metadata with smart composition constraints, and clear data-source labeling on all diagrams.
 
 ---
 
-### 2. Multi-Source Data Orchestrator
+### 1. System Metadata with Dynamic Composition Constraints
 
-**What changes:**
-- Create a new DB table `element_properties_cache` to store previously fetched data (element_number, source, property_type, data JSON, fetched_at)
-- Create a `src/hooks/useDataOrchestrator.ts` hook that:
-  1. Checks local DB cache first via Supabase query
-  2. Falls back to Materials Project API (existing edge function)
-  3. Exposes a manual "Query AFLOW" trigger
-- Create a new edge function `aflow-proxy` to fetch Bulk/Shear Modulus and thermal properties from the AFLOW REST API (`aflowlib.org/API`)
-- Add a "Query AFLOW API" button in the `ElementDetail` panel that triggers the AFLOW fetch and displays results
+**What:** Add a `SystemMetadata` type and a metadata registry that defines per-system composition limits, data source tier, and display defaults.
 
-**Files:** New `supabase/functions/aflow-proxy/index.ts`, new `src/hooks/useDataOrchestrator.ts`, update `src/components/ElementDetail.tsx`, DB migration for cache table
+**Changes:**
+- In `src/data/binaryPhaseDiagrams.ts`: extend `BinaryPhaseDiagramData` with a `dataSource` field (`"calphad" | "materials_project" | "ml_predicted"`) and a `metadata` object (`{ defaultRange: [number, number], fullRange: [number, number], compositionLabel?: string }`)
+- Add metadata for existing systems (Fe-C defaults to `[0, 0.07]` with full range `[0, 0.25]`, Cu-Zn defaults `[0, 1]`, etc.)
+- In `BinaryPhaseDiagram.tsx`: use metadata to set initial `xMax`, add an "Unlock Full Range" toggle button that switches between `defaultRange` and `fullRange`
 
 ---
 
-### 3. Simulation Workflow UI (Compute Modal)
+### 2. Data Tier Fallback Logic in Orchestrator
 
-**What changes:**
-- Create `src/components/ComputeModal.tsx` — a dialog that appears for element pairs without existing CALPHAD data
-- Fields: MD Temperature Range (min/max sliders), DFT Functional Selection (dropdown: PBE, PBEsol, SCAN, r2SCAN)
-- Status indicator with three states: "Idle", "API Fetching" (pulsing blue), "Active Simulation" (pulsing orange)
-- Wire the modal into `Index.tsx` — when "Generate Diagram" is clicked and no local data exists, show this modal instead of the error message
-- On submit, call the existing `binary-simulation` edge function with the additional parameters
+**What:** Upgrade `useDataOrchestrator` and create a new `usePhaseDiagramResolver` hook that implements the 3-tier strategy.
 
-**Files:** New `src/components/ComputeModal.tsx`, update `src/pages/Index.tsx`
+**New file: `src/hooks/usePhaseDiagramResolver.ts`**
+- **Tier 1:** Check `getBinaryDiagram()` for local CALPHAD data. If found, return with `dataSource: "calphad"`.
+- **Tier 2:** If no CALPHAD, call `binary-simulation` edge function (which fetches Materials Project). Build an approximate diagram from MP formation energies. Return with `dataSource: "materials_project"`.
+- **Tier 3:** If MP returns no useful data, run the ML classifier (edge function) to predict phase boundaries from elemental properties. Return with `dataSource: "ml_predicted"`.
 
----
-
-### 4. Physical Consistency Check (PINN-Inspired Gibbs Phase Rule Validation)
-
-**What changes:**
-- Create `src/lib/phaseConsistency.ts` with validation logic:
-  - Check boundary curves for non-physical crossings (two boundaries of the same type intersecting)
-  - Verify Gibbs phase rule: F = C - P + 2; for a binary (C=2) at fixed pressure, max phases in equilibrium = 3 (invariant), 2 (univariant line), 1 (area)
-  - Flag regions where >3 phases appear to coexist
-- Add an "Uncertainty Badge" to `BinaryPhaseDiagram` that shows "High Uncertainty" with a warning icon when violations are detected
-- Display specific violations in a collapsible details section
-
-**Files:** New `src/lib/phaseConsistency.ts`, update `src/components/BinaryPhaseDiagram.tsx`
+**Update `src/pages/Index.tsx`:** Replace the current generate logic to use `usePhaseDiagramResolver` instead of manual `getBinaryDiagram` + `ComputeModal` branching.
 
 ---
 
-### 5. Thermodynamic Curves (G vs. T) in Element Detail
+### 3. ML Phase Boundary Classifier (Edge Function)
 
-**What changes:**
-- Create `src/components/GibbsEnergyChart.tsx` — a Recharts `LineChart` showing Gibbs free energy vs. temperature for each phase (solid, liquid, gas)
-- Use simplified thermodynamic model: G(T) = H - T*S, with enthalpy/entropy derived from existing melting/boiling point data and DFT cohesive energies
-- If Materials Project or AFLOW data provides formation energies, overlay those as reference points
-- Add this chart to `ElementDetail` between the phase diagram and DFT sections
+**New file: `supabase/functions/ml-phase-predict/index.ts`**
 
-**Files:** New `src/components/GibbsEnergyChart.tsx`, update `src/components/ElementDetail.tsx`
-
----
-
-### Database Migration
-
-A single migration to create the cache table:
-
-```sql
-CREATE TABLE public.element_properties_cache (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  element_number integer NOT NULL,
-  source text NOT NULL,  -- 'materials_project', 'aflow', 'local'
-  property_type text NOT NULL,  -- 'formation_energy', 'mechanical', 'thermal'
-  data jsonb NOT NULL,
-  fetched_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(element_number, source, property_type)
-);
-
-ALTER TABLE public.element_properties_cache ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Allow public read"
-  ON public.element_properties_cache FOR SELECT
-  TO anon, authenticated
-  USING (true);
-
-CREATE POLICY "Allow service insert/update"
-  ON public.element_properties_cache FOR ALL
-  TO service_role
-  USING (true);
-```
+A lightweight edge function that:
+- Accepts two element symbols + their properties (electronegativity, atomic radius, melting point, density)
+- Uses Lovable AI (Gemini Flash) with structured tool calling to predict:
+  - Likely phase types (eutectic, peritectic, solid solution, intermetallic)
+  - Approximate invariant temperatures
+  - Estimated solubility limits
+- Returns structured JSON matching `BinaryPhaseDiagramData` format with `dataSource: "ml_predicted"`
+- This replaces the need for a Python-hosted Random Forest/XGBoost — the LLM acts as the "pre-trained classifier" using its training knowledge of materials science
 
 ---
 
-### Summary of New Files
-- `src/components/ComputeModal.tsx`
-- `src/components/GibbsEnergyChart.tsx`
-- `src/lib/phaseConsistency.ts`
-- `src/hooks/useDataOrchestrator.ts`
-- `supabase/functions/aflow-proxy/index.ts`
+### 4. PINN-Inspired Boundary Interpolation
 
-### Modified Files
-- `src/data/binaryPhaseDiagrams.ts` — add `maxComposition` to interface and Fe-C data
-- `src/components/BinaryPhaseDiagram.tsx` — adaptive scaling, zoom controls, uncertainty badge
-- `src/components/ElementDetail.tsx` — add Gibbs chart, AFLOW button, orchestrator integration
-- `src/pages/Index.tsx` — compute modal for missing diagrams
-- `supabase/config.toml` — register `aflow-proxy` function
+**What:** For Tier 2/3 diagrams, add interpolation logic that connects sparse DFT/MP data points into smooth phase boundaries.
+
+**New file: `src/lib/boundaryInterpolation.ts`**
+- Monotone cubic spline interpolation for boundary curves (connects DFT formation energy points at T=0 with estimated melting/transition temperatures)
+- Enforces physical constraints: boundaries must not cross non-physically, liquidus must be above solidus, invariant isotherms must be horizontal
+- Uses the existing `phaseConsistency.ts` validator as a post-check
+
+---
+
+### 5. Visual Data Source Badges
+
+**What:** Add clear visual indicators showing whether data is verified CALPHAD, MP-derived, or ML-predicted.
+
+**Changes to `BinaryPhaseDiagram.tsx`:**
+- Add a colored badge next to the title:
+  - Green "Verified (CALPHAD)" for Tier 1
+  - Blue "Experimental (Materials Project)" for Tier 2
+  - Amber "ML-Predicted (Estimated)" for Tier 3
+- Add a small info tooltip explaining the data source and confidence level
+- Include the existing "High Uncertainty" badge from `phaseConsistency.ts` alongside the source badge when violations are found
+
+---
+
+### 6. Updated Compute Modal
+
+**Changes to `ComputeModal.tsx`:**
+- Add a "Data Source" section showing which tiers were attempted and their status
+- Show tier progression: "Checking CALPHAD... → Querying Materials Project... → Running ML Prediction..."
+- Update status indicator to reflect the 3-tier process
+
+---
+
+### Summary
+
+| Item | Files |
+|------|-------|
+| System metadata + composition constraints | `binaryPhaseDiagrams.ts`, `BinaryPhaseDiagram.tsx` |
+| Phase diagram resolver hook | New `usePhaseDiagramResolver.ts` |
+| ML prediction edge function | New `ml-phase-predict/index.ts` |
+| Boundary interpolation | New `boundaryInterpolation.ts` |
+| Visual source badges | `BinaryPhaseDiagram.tsx` |
+| Compute modal update | `ComputeModal.tsx` |
+| Index page wiring | `Index.tsx` |
+
+No database changes needed -- the existing `element_properties_cache` table can store ML predictions.
 
