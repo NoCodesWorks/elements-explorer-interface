@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.binary-simulation]
 verify_jwt = false
+
+[functions.aflow-proxy]
+verify_jwt = false
+
+[functions.ml-phase-predict]
+verify_jwt = false
