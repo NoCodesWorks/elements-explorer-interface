@@ -9,7 +9,7 @@ import { BinaryPhaseDiagram } from "@/components/BinaryPhaseDiagram";
 import type { SimulationResult } from "@/components/BinaryPhaseDiagram";
 import { SimulationLoader } from "@/components/SimulationLoader";
 import { ComputeModal } from "@/components/ComputeModal";
-import { getBinaryDiagram } from "@/data/binaryPhaseDiagrams";
+import { usePhaseDiagramResolver } from "@/hooks/usePhaseDiagramResolver";
 import { FlaskConical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -28,33 +28,23 @@ const Index = () => {
   const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
   const [computeModalOpen, setComputeModalOpen] = useState(false);
 
+  const resolver = usePhaseDiagramResolver();
+
   const handleElementClick = useCallback(
     (el: Element) => {
-      if (!binaryMode) {
-        setSelected(el);
-        return;
-      }
-      // Binary selection logic
+      if (!binaryMode) { setSelected(el); return; }
       if (binarySelection[0]?.number === el.number) {
-        setBinarySelection([null, binarySelection[1]]);
-        setBinaryError(null);
-        return;
+        setBinarySelection([null, binarySelection[1]]); setBinaryError(null); return;
       }
       if (binarySelection[1]?.number === el.number) {
-        setBinarySelection([binarySelection[0], null]);
-        setBinaryError(null);
-        return;
+        setBinarySelection([binarySelection[0], null]); setBinaryError(null); return;
       }
       if (!binarySelection[0]) {
-        setBinarySelection([el, binarySelection[1]]);
-        setBinaryError(null);
+        setBinarySelection([el, binarySelection[1]]); setBinaryError(null);
       } else if (!binarySelection[1]) {
-        setBinarySelection([binarySelection[0], el]);
-        setBinaryError(null);
+        setBinarySelection([binarySelection[0], el]); setBinaryError(null);
       } else {
-        // Replace second
-        setBinarySelection([binarySelection[0], el]);
-        setBinaryError(null);
+        setBinarySelection([binarySelection[0], el]); setBinaryError(null);
       }
     },
     [binaryMode, binarySelection],
@@ -67,58 +57,65 @@ const Index = () => {
     return undefined;
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!binarySelection[0] || !binarySelection[1]) return;
-    const diagram = getBinaryDiagram(binarySelection[0].number, binarySelection[1].number);
-    if (!diagram) {
-      // No CALPHAD data — open compute modal
-      setBinaryError(null);
-      setComputeModalOpen(true);
-      return;
-    }
     setBinaryError(null);
     setSimulationResult(null);
     setSimulating(true);
 
-    // Fire the backend simulation request in parallel with the loading animation
-    supabase.functions
-      .invoke("binary-simulation", {
-        body: {
-          elementA: binarySelection[0].number,
-          elementB: binarySelection[1].number,
-          symbolA: binarySelection[0].symbol,
-          symbolB: binarySelection[1].symbol,
-        },
-      })
-      .then(({ data, error }) => {
-        if (error) {
-          console.error("Simulation error:", error);
-          toast.error("Backend simulation failed — showing CALPHAD data only");
-        } else if (data) {
-          setSimulationResult(data as SimulationResult);
-        }
-      });
+    // Use the multi-tier resolver
+    await resolver.resolve(binarySelection[0], binarySelection[1]);
   };
 
+  // Watch resolver state to transition UI
   const handleSimulationComplete = () => {
     setSimulating(false);
-    setBinaryDiagramOpen(true);
+
+    if (resolver.state.diagram) {
+      // If it's a CALPHAD diagram, also fire the backend for MP compounds
+      if (resolver.state.dataSource === "calphad") {
+        supabase.functions
+          .invoke("binary-simulation", {
+            body: {
+              elementA: binarySelection[0]!.number,
+              elementB: binarySelection[1]!.number,
+              symbolA: binarySelection[0]!.symbol,
+              symbolB: binarySelection[1]!.symbol,
+            },
+          })
+          .then(({ data, error }) => {
+            if (error) {
+              console.error("Simulation error:", error);
+              toast.error("Backend simulation failed — showing CALPHAD data only");
+            } else if (data) {
+              setSimulationResult(data as SimulationResult);
+            }
+          });
+      }
+      setBinaryDiagramOpen(true);
+    } else if (resolver.state.error) {
+      // All tiers failed — show compute modal as fallback
+      setComputeModalOpen(true);
+    }
   };
+
+  // Check if resolver finished while simulating
+  const resolverDone = !resolver.state.resolving && simulating;
+  if (resolverDone) {
+    // Trigger completion after animation
+    // The SimulationLoader calls onComplete which triggers handleSimulationComplete
+  }
 
   const toggleBinaryMode = () => {
     setBinaryMode((prev) => {
       if (prev) {
         setBinarySelection([null, null]);
         setBinaryError(null);
+        resolver.reset();
       }
       return !prev;
     });
   };
-
-  const binaryDiagramData =
-    binarySelection[0] && binarySelection[1]
-      ? getBinaryDiagram(binarySelection[0].number, binarySelection[1].number)
-      : null;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -169,9 +166,10 @@ const Index = () => {
             {binarySelection[0] && binarySelection[1] && (
               <button
                 onClick={handleGenerate}
-                className="px-3 py-1 rounded-md text-xs font-medium bg-accent text-accent-foreground hover:bg-accent/80 transition-colors"
+                disabled={resolver.state.resolving}
+                className="px-3 py-1 rounded-md text-xs font-medium bg-accent text-accent-foreground hover:bg-accent/80 transition-colors disabled:opacity-50"
               >
-                Generate Diagram
+                {resolver.state.resolving ? "Resolving…" : "Generate Diagram"}
               </button>
             )}
           </div>
@@ -237,15 +235,17 @@ const Index = () => {
         />
       )}
 
-      {binaryDiagramOpen && binaryDiagramData && (
+      {binaryDiagramOpen && resolver.state.diagram && (
         <BinaryPhaseDiagram
-          data={binaryDiagramData}
-          onClose={() => setBinaryDiagramOpen(false)}
+          data={resolver.state.diagram}
+          onClose={() => { setBinaryDiagramOpen(false); resolver.reset(); }}
           simulationResult={simulationResult}
+          confidence={resolver.state.confidence}
+          reasoning={resolver.state.reasoning}
         />
       )}
 
-      {/* Compute Modal for missing diagrams */}
+      {/* Compute Modal fallback */}
       {binarySelection[0] && binarySelection[1] && (
         <ComputeModal
           open={computeModalOpen}
@@ -256,6 +256,11 @@ const Index = () => {
             setSimulationResult(result);
             setComputeModalOpen(false);
             toast.success("Computation result received");
+          }}
+          tierStatus={{
+            tier1: resolver.state.tier1,
+            tier2: resolver.state.tier2,
+            tier3: resolver.state.tier3,
           }}
         />
       )}

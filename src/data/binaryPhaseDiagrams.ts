@@ -33,6 +33,14 @@ export interface PhaseZone {
   polygon: [number, number][];
 }
 
+export type DataSource = "calphad" | "materials_project" | "ml_predicted";
+
+export interface SystemMetadata {
+  defaultRange: [number, number];
+  fullRange: [number, number];
+  compositionLabel?: string;
+}
+
 export interface BinaryPhaseDiagramData {
   systemName: string;
   elementA: string;
@@ -45,6 +53,8 @@ export interface BinaryPhaseDiagramData {
   zones: PhaseZone[];
   notes: string;
   maxComposition?: number; // Max x-axis value (defaults to 1.0)
+  dataSource?: DataSource;
+  metadata?: SystemMetadata;
 }
 
 function makeKey(a: number, b: number): string {
@@ -92,7 +102,9 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     elementB: "C",
     elementANumber: 26,
     elementBNumber: 6,
-    maxComposition: 0.25, // Cementite region — full view; zoom to 0.0667 for steel region
+    maxComposition: 0.25,
+    dataSource: "calphad",
+    metadata: { defaultRange: [0, 0.07], fullRange: [0, 0.25], compositionLabel: "Carbon (wt%)" },
     notes: "Metastable Fe–Fe₃C system at 1 atm. Classic steel phase diagram.",
     regions: [
       { name: "α-Fe (Ferrite)", color: "hsl(200, 80%, 55%)" },
@@ -186,6 +198,8 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     elementB: "Zn",
     elementANumber: 29,
     elementBNumber: 30,
+    dataSource: "calphad",
+    metadata: { defaultRange: [0, 1], fullRange: [0, 1] },
     notes: "Brass system at 1 atm. Multiple intermediate phases (β, γ, δ, ε).",
     regions: [
       { name: "α (FCC Cu)", color: "hsl(200, 80%, 55%)" },
@@ -246,6 +260,8 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     elementB: "Cu",
     elementANumber: 13,
     elementBNumber: 29,
+    dataSource: "calphad",
+    metadata: { defaultRange: [0, 0.35], fullRange: [0, 1] },
     notes: "Classic age-hardening system (2xxx series alloys) at 1 atm.",
     regions: [
       { name: "α (FCC Al)", color: "hsl(200, 80%, 55%)" },
@@ -302,6 +318,8 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     elementB: "Al",
     elementANumber: 22,
     elementBNumber: 13,
+    dataSource: "calphad",
+    metadata: { defaultRange: [0, 1], fullRange: [0, 1] },
     notes: "Intermetallic system for aerospace alloys. γ-TiAl is key structural material.",
     regions: [
       { name: "α-Ti (HCP)", color: "hsl(200, 80%, 55%)" },
@@ -363,6 +381,8 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     elementB: "Al",
     elementANumber: 28,
     elementBNumber: 13,
+    dataSource: "calphad",
+    metadata: { defaultRange: [0, 1], fullRange: [0, 1] },
     notes: "Superalloy system. γ' (Ni₃Al) precipitates provide high-temperature strength.",
     regions: [
       { name: "γ (FCC Ni)", color: "hsl(200, 80%, 55%)" },
@@ -413,6 +433,8 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     elementB: "Sn",
     elementANumber: 82,
     elementBNumber: 50,
+    dataSource: "calphad",
+    metadata: { defaultRange: [0, 1], fullRange: [0, 1] },
     notes: "Classic eutectic solder system at 1 atm.",
     regions: [
       { name: "α (FCC Pb)", color: "hsl(200, 80%, 55%)" },
@@ -478,6 +500,8 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     elementB: "Ge",
     elementANumber: 14,
     elementBNumber: 32,
+    dataSource: "calphad",
+    metadata: { defaultRange: [0, 1], fullRange: [0, 1] },
     notes: "Complete solid solution (isomorphous) system at 1 atm. Used in SiGe semiconductors.",
     regions: [
       { name: "Solid solution (Diamond)", color: "hsl(200, 80%, 55%)" },
@@ -518,6 +542,8 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     elementB: "Au",
     elementANumber: 29,
     elementBNumber: 79,
+    dataSource: "calphad",
+    metadata: { defaultRange: [0, 1], fullRange: [0, 1] },
     notes: "Ordering system at 1 atm. AuCu and AuCu₃ ordered phases.",
     regions: [
       { name: "FCC solid solution", color: "hsl(200, 80%, 55%)" },
@@ -581,6 +607,8 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     elementB: "Ni",
     elementANumber: 26,
     elementBNumber: 28,
+    dataSource: "calphad",
+    metadata: { defaultRange: [0, 1], fullRange: [0, 1] },
     notes: "Complete γ solid solution at high T. FeNi₃ ordering at low T. Invar/permalloy alloys.",
     regions: [
       { name: "α-Fe (BCC)", color: "hsl(200, 80%, 55%)" },
@@ -653,6 +681,8 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     elementB: "Sn",
     elementANumber: 29,
     elementBNumber: 50,
+    dataSource: "calphad",
+    metadata: { defaultRange: [0, 0.5], fullRange: [0, 1] },
     notes: "Bronze system at 1 atm. Multiple peritectic reactions.",
     regions: [
       { name: "α (FCC Cu)", color: "hsl(200, 80%, 55%)" },
@@ -736,6 +766,8 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     elementB: "Si",
     elementANumber: 13,
     elementBNumber: 14,
+    dataSource: "calphad",
+    metadata: { defaultRange: [0, 1], fullRange: [0, 1] },
     notes: "Simple eutectic system at 1 atm. Foundry alloy basis (A356, 4xxx series).",
     regions: [
       { name: "α (FCC Al)", color: "hsl(200, 80%, 55%)" },
@@ -796,6 +828,8 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     elementB: "Ag",
     elementANumber: 29,
     elementBNumber: 47,
+    dataSource: "calphad",
+    metadata: { defaultRange: [0, 1], fullRange: [0, 1] },
     notes: "Simple eutectic system at 1 atm. Sterling silver, brazing alloys.",
     regions: [
       { name: "α (FCC Cu)", color: "hsl(200, 80%, 55%)" },

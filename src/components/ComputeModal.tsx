@@ -1,27 +1,20 @@
 import { useState } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Check, Loader2, XCircle, Circle } from "lucide-react";
 import type { SimulationResult } from "@/components/BinaryPhaseDiagram";
+import type { TierStatus } from "@/hooks/usePhaseDiagramResolver";
 
-type SimStatus = "idle" | "fetching" | "simulating";
+type SimStatus = "idle" | "resolving" | "fetching" | "simulating";
 
 interface ComputeModalProps {
   open: boolean;
@@ -29,6 +22,7 @@ interface ComputeModalProps {
   elementA: { number: number; symbol: string; name: string };
   elementB: { number: number; symbol: string; name: string };
   onResult: (result: SimulationResult) => void;
+  tierStatus?: { tier1: TierStatus; tier2: TierStatus; tier3: TierStatus };
 }
 
 const DFT_FUNCTIONALS = [
@@ -38,19 +32,31 @@ const DFT_FUNCTIONALS = [
   { value: "r2SCAN", label: "r2SCAN (regularized SCAN)" },
 ];
 
-export function ComputeModal({ open, onOpenChange, elementA, elementB, onResult }: ComputeModalProps) {
+function TierIcon({ status }: { status: TierStatus }) {
+  switch (status) {
+    case "checking": return <Loader2 size={12} className="animate-spin text-blue-400" />;
+    case "found": return <Check size={12} className="text-emerald-400" />;
+    case "not_found": return <XCircle size={12} className="text-muted-foreground" />;
+    case "error": return <XCircle size={12} className="text-destructive" />;
+    default: return <Circle size={12} className="text-muted-foreground/40" />;
+  }
+}
+
+export function ComputeModal({ open, onOpenChange, elementA, elementB, onResult, tierStatus }: ComputeModalProps) {
   const [tempRange, setTempRange] = useState([300, 2500]);
   const [functional, setFunctional] = useState("PBE");
   const [status, setStatus] = useState<SimStatus>("idle");
 
   const statusColors: Record<SimStatus, string> = {
     idle: "bg-muted",
+    resolving: "bg-purple-500",
     fetching: "bg-blue-500",
     simulating: "bg-orange-500",
   };
 
   const statusLabels: Record<SimStatus, string> = {
     idle: "Idle",
+    resolving: "Resolving data tiers…",
     fetching: "API Fetching…",
     simulating: "Active Simulation…",
   };
@@ -60,25 +66,16 @@ export function ComputeModal({ open, onOpenChange, elementA, elementB, onResult 
     try {
       const { data, error } = await supabase.functions.invoke("binary-simulation", {
         body: {
-          elementA: elementA.number,
-          elementB: elementB.number,
-          symbolA: elementA.symbol,
-          symbolB: elementB.symbol,
-          tempMin: tempRange[0],
-          tempMax: tempRange[1],
-          functional,
+          elementA: elementA.number, elementB: elementB.number,
+          symbolA: elementA.symbol, symbolB: elementB.symbol,
+          tempMin: tempRange[0], tempMax: tempRange[1], functional,
         },
       });
 
       setStatus("simulating");
-
-      // Small delay to show simulating state
       await new Promise((r) => setTimeout(r, 1500));
 
-      if (error) {
-        throw new Error(error.message);
-      }
-
+      if (error) throw new Error(error.message);
       if (data) {
         onResult(data as SimulationResult);
         toast.success("Computation complete");
@@ -103,27 +100,39 @@ export function ComputeModal({ open, onOpenChange, elementA, elementB, onResult 
         </DialogHeader>
 
         <div className="space-y-5 py-2">
+          {/* Tier progression */}
+          {tierStatus && (
+            <div className="space-y-1.5 p-2 rounded bg-secondary/50 border border-border">
+              <span className="text-[0.65rem] font-medium text-muted-foreground">Data Source Resolution</span>
+              <div className="flex items-center gap-3 text-[0.6rem]">
+                <div className="flex items-center gap-1">
+                  <TierIcon status={tierStatus.tier1} />
+                  <span className="text-muted-foreground">CALPHAD</span>
+                </div>
+                <span className="text-muted-foreground/30">→</span>
+                <div className="flex items-center gap-1">
+                  <TierIcon status={tierStatus.tier2} />
+                  <span className="text-muted-foreground">Materials Project</span>
+                </div>
+                <span className="text-muted-foreground/30">→</span>
+                <div className="flex items-center gap-1">
+                  <TierIcon status={tierStatus.tier3} />
+                  <span className="text-muted-foreground">ML Prediction</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Status indicator */}
           <div className="flex items-center gap-2">
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${statusColors[status]} ${
-                status !== "idle" ? "animate-pulse" : ""
-              }`}
-            />
+            <span className={`w-2.5 h-2.5 rounded-full ${statusColors[status]} ${status !== "idle" ? "animate-pulse" : ""}`} />
             <span className="text-xs text-muted-foreground">{statusLabels[status]}</span>
           </div>
 
           {/* MD Temperature Range */}
           <div className="space-y-2">
             <Label className="text-xs">MD Temperature Range (K)</Label>
-            <Slider
-              min={100}
-              max={5000}
-              step={50}
-              value={tempRange}
-              onValueChange={setTempRange}
-              className="w-full"
-            />
+            <Slider min={100} max={5000} step={50} value={tempRange} onValueChange={setTempRange} className="w-full" />
             <div className="flex justify-between text-[0.65rem] text-muted-foreground font-mono-code">
               <span>{tempRange[0]} K</span>
               <span>{tempRange[1]} K</span>
@@ -134,14 +143,10 @@ export function ComputeModal({ open, onOpenChange, elementA, elementB, onResult 
           <div className="space-y-2">
             <Label className="text-xs">DFT Functional</Label>
             <Select value={functional} onValueChange={setFunctional}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {DFT_FUNCTIONALS.map((f) => (
-                  <SelectItem key={f.value} value={f.value} className="text-xs">
-                    {f.label}
-                  </SelectItem>
+                  <SelectItem key={f.value} value={f.value} className="text-xs">{f.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -149,9 +154,7 @@ export function ComputeModal({ open, onOpenChange, elementA, elementB, onResult 
         </div>
 
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button size="sm" onClick={handleCompute} disabled={status !== "idle"}>
             {status !== "idle" ? "Computing…" : "Run Computation"}
           </Button>
