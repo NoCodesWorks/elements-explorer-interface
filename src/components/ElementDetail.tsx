@@ -13,8 +13,11 @@ import { TTTDiagramViewer } from "@/components/TTTDiagramViewer";
 import { DftProperties } from "@/components/DftProperties";
 import { MPProperties } from "@/components/MPProperties";
 import { PhaseDiagram } from "@/components/PhaseDiagram";
+import { GibbsEnergyChart } from "@/components/GibbsEnergyChart";
 import { useMaterialsProject, hasMPData } from "@/hooks/useMaterialsProject";
-import { X } from "lucide-react";
+import { useDataOrchestrator } from "@/hooks/useDataOrchestrator";
+import { X, Database, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const categoryBgMap: Record<string, string> = {
   alkali: "bg-element-alkali",
@@ -54,6 +57,7 @@ export function ElementDetail({ element, onClose, temperature }: ElementDetailPr
   const phase = getPhase(element, temperature);
   const phaseLabel = phase === "unknown" ? "Unknown" : phase.charAt(0).toUpperCase() + phase.slice(1);
   const { data: mpData, isLoading: mpLoading, error: mpError } = useMaterialsProject(element.number);
+  const { data: aflowData, loading: aflowLoading, error: aflowError, queryAflow } = useDataOrchestrator(element.number, element.symbol);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" onClick={onClose}>
@@ -162,6 +166,51 @@ export function ElementDetail({ element, onClose, temperature }: ElementDetailPr
         {hasMPData(element.number) && (
           <MPProperties data={mpData} isLoading={mpLoading} error={mpError} />
         )}
+
+        {/* Gibbs Free Energy Chart */}
+        {element.meltingPoint && element.boilingPoint && (
+          <div className="mt-4 p-3 rounded-md bg-background/50 border border-border">
+            <h3 className="text-xs text-muted-foreground mb-2 text-center font-medium">Gibbs Free Energy (G vs. T)</h3>
+            <GibbsEnergyChart element={element} />
+          </div>
+        )}
+
+        {/* AFLOW Data */}
+        <div className="mt-4 p-3 rounded-md bg-background/50 border border-border">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs text-muted-foreground font-medium">AFLOW Database</h3>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 text-[0.6rem] px-2"
+              onClick={queryAflow}
+              disabled={aflowLoading}
+            >
+              {aflowLoading ? (
+                <><Loader2 size={10} className="animate-spin mr-1" /> Querying…</>
+              ) : (
+                <><Database size={10} className="mr-1" /> Query AFLOW API</>
+              )}
+            </Button>
+          </div>
+          {aflowError && <p className="text-[0.6rem] text-destructive">{aflowError}</p>}
+          {aflowData && aflowData.properties.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-[0.55rem] text-muted-foreground">Source: {aflowData.source}</p>
+              {aflowData.properties.slice(0, 4).map((p, i) => (
+                <div key={i} className="text-[0.6rem] font-mono-code text-foreground flex flex-wrap gap-2">
+                  <span className="font-medium">{p.compound}</span>
+                  {p.bulkModulus != null && <span className="text-muted-foreground">B={p.bulkModulus.toFixed(1)} GPa</span>}
+                  {p.shearModulus != null && <span className="text-muted-foreground">G={p.shearModulus.toFixed(1)} GPa</span>}
+                  {p.bandGap != null && <span className="text-muted-foreground">Eg={p.bandGap.toFixed(2)} eV</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          {aflowData && aflowData.properties.length === 0 && (
+            <p className="text-[0.6rem] text-muted-foreground">No AFLOW data found for {element.symbol}</p>
+          )}
+        </div>
 
         {/* Phase Diagram */}
         {phaseDiagrams[element.number] && (

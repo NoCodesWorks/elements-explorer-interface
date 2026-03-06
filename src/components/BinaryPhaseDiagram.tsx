@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef, useMemo } from "react";
-import { X } from "lucide-react";
+import { X, AlertTriangle, ChevronDown, ChevronUp, ZoomIn } from "lucide-react";
 import type { BinaryPhaseDiagramData, PhaseZone, BinaryBoundary } from "@/data/binaryPhaseDiagrams";
+import { validatePhaseDiagram, type ConsistencyViolation } from "@/lib/phaseConsistency";
+import { Slider } from "@/components/ui/slider";
 
 // Point-in-polygon using ray casting
 function pointInPolygon(x: number, y: number, polygon: [number, number][]): boolean {
@@ -49,7 +51,16 @@ interface BinaryPhaseDiagramProps {
 export function BinaryPhaseDiagram({ data, onClose, simulationResult }: BinaryPhaseDiagramProps) {
   const [hoveredZone, setHoveredZone] = useState<PhaseZone | null>(null);
   const [cursorPos, setCursorPos] = useState<{ x: number; T: number } | null>(null);
+  const [violationsOpen, setViolationsOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
+
+  // Adaptive x-axis scaling
+  const defaultMax = data.maxComposition ?? 1.0;
+  const [xMax, setXMax] = useState(defaultMax);
+
+  // Physical consistency check
+  const violations = useMemo(() => validatePhaseDiagram(data), [data]);
+  const hasViolations = violations.length > 0;
 
   // Chart layout constants
   const width = 520;
@@ -66,49 +77,52 @@ export function BinaryPhaseDiagram({ data, onClose, simulationResult }: BinaryPh
     ];
     const lo = Math.min(...allT);
     const hi = Math.max(...allT);
-    // Round to nice values
     return { minT: Math.floor(lo / 50) * 50 - 50, maxT: Math.ceil(hi / 50) * 50 + 50 };
   }, [data]);
 
-  // Map data coords to SVG pixel coords
-  const xScale = useCallback((v: number) => margin.left + v * plotW, [plotW]);
+  // Map data coords to SVG pixel coords — using dynamic xMax
+  const xScale = useCallback((v: number) => margin.left + (v / xMax) * plotW, [plotW, xMax]);
   const yScale = useCallback((T: number) => margin.top + plotH - ((T - minT) / (maxT - minT)) * plotH, [plotH, minT, maxT]);
 
   // Reverse map
-  const xInv = useCallback((px: number) => (px - margin.left) / plotW, [plotW]);
+  const xInv = useCallback((px: number) => ((px - margin.left) / plotW) * xMax, [plotW, xMax]);
   const yInv = useCallback((py: number) => maxT - ((py - margin.top) / plotH) * (maxT - minT), [plotH, minT, maxT]);
 
-  // Build SVG path for a polygon
   const polygonPath = useCallback(
     (polygon: [number, number][]) =>
       polygon.map(([x, T], i) => `${i === 0 ? "M" : "L"}${xScale(x)},${yScale(T)}`).join(" ") + " Z",
     [xScale, yScale],
   );
 
-  // Build SVG path for a boundary
   const boundaryPath = useCallback(
     (b: BinaryBoundary) =>
       b.points.map((p, i) => `${i === 0 ? "M" : "L"}${xScale(p.x)},${yScale(p.T)}`).join(" "),
     [xScale, yScale],
   );
 
-  // Centroid of polygon for label placement
   const centroid = useCallback(
     (polygon: [number, number][]): [number, number] => {
-      // Clip polygon to visible area
       const clipped = polygon.map(([x, T]) => [
-        Math.max(0, Math.min(1, x)),
+        Math.max(0, Math.min(xMax, x)),
         Math.max(minT, Math.min(maxT, T)),
       ] as [number, number]);
       const cx = clipped.reduce((s, [x]) => s + x, 0) / clipped.length;
       const cT = clipped.reduce((s, [, T]) => s + T, 0) / clipped.length;
       return [xScale(cx), yScale(cT)];
     },
-    [xScale, yScale, minT, maxT],
+    [xScale, yScale, minT, maxT, xMax],
   );
 
-  // Axis ticks
-  const xTicks = [0, 0.2, 0.4, 0.6, 0.8, 1.0];
+  // Dynamic x-axis ticks
+  const xTicks = useMemo(() => {
+    const ticks: number[] = [];
+    const count = 5;
+    for (let i = 0; i <= count; i++) {
+      ticks.push((i / count) * xMax);
+    }
+    return ticks;
+  }, [xMax]);
+
   const yTickCount = 8;
   const yTicks = useMemo(() => {
     const step = Math.round((maxT - minT) / yTickCount / 50) * 50;
@@ -148,10 +162,35 @@ export function BinaryPhaseDiagram({ data, onClose, simulationResult }: BinaryPh
           <X size={18} />
         </button>
 
-        <h2 className="text-lg font-bold text-foreground font-mono-code">
-          {data.systemName} Binary Phase Diagram
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-bold text-foreground font-mono-code">
+            {data.systemName} Binary Phase Diagram
+          </h2>
+          {hasViolations && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.6rem] font-medium bg-destructive/15 text-destructive border border-destructive/30">
+              <AlertTriangle size={10} />
+              High Uncertainty
+            </span>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground mt-0.5">at 1 atm — {data.notes}</p>
+
+        {/* Zoom slider */}
+        <div className="flex items-center gap-2 mt-3 px-1">
+          <ZoomIn size={12} className="text-muted-foreground shrink-0" />
+          <span className="text-[0.6rem] text-muted-foreground whitespace-nowrap">X-Axis Max:</span>
+          <Slider
+            min={Math.min(0.05, defaultMax)}
+            max={1.0}
+            step={0.01}
+            value={[xMax]}
+            onValueChange={([v]) => setXMax(v)}
+            className="flex-1"
+          />
+          <span className="text-[0.6rem] font-mono-code text-foreground w-12 text-right">
+            {(xMax * 100).toFixed(0)}%
+          </span>
+        </div>
 
         {/* Hover zone indicator */}
         <div className="h-6 mt-2 flex items-center gap-2">
@@ -178,14 +217,12 @@ export function BinaryPhaseDiagram({ data, onClose, simulationResult }: BinaryPh
           onMouseMove={handleMouseMove}
           onMouseLeave={() => { setHoveredZone(null); setCursorPos(null); }}
         >
-          {/* Clip path for plot area */}
           <defs>
             <clipPath id="plotClip">
               <rect x={margin.left} y={margin.top} width={plotW} height={plotH} />
             </clipPath>
           </defs>
 
-          {/* Background */}
           <rect x={margin.left} y={margin.top} width={plotW} height={plotH} fill="hsl(220, 18%, 10%)" />
 
           {/* Filled phase zones */}
@@ -283,7 +320,7 @@ export function BinaryPhaseDiagram({ data, onClose, simulationResult }: BinaryPh
             <g key={`xt${t}`}>
               <line x1={xScale(t)} y1={margin.top + plotH} x2={xScale(t)} y2={margin.top + plotH + 4} stroke="hsl(220, 15%, 30%)" />
               <text x={xScale(t)} y={margin.top + plotH + 14} textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize={9}>
-                {(t * 100).toFixed(0)}%
+                {(t * 100).toFixed(xMax < 0.1 ? 1 : 0)}%
               </text>
             </g>
           ))}
@@ -312,7 +349,6 @@ export function BinaryPhaseDiagram({ data, onClose, simulationResult }: BinaryPh
             Temperature (K)
           </text>
 
-          {/* Plot border */}
           <rect x={margin.left} y={margin.top} width={plotW} height={plotH} fill="none" stroke="hsl(220, 15%, 30%)" />
         </svg>
 
@@ -325,6 +361,30 @@ export function BinaryPhaseDiagram({ data, onClose, simulationResult }: BinaryPh
             </span>
           ))}
         </div>
+
+        {/* Consistency violations */}
+        {hasViolations && (
+          <div className="mt-3 pt-3 border-t border-border">
+            <button
+              onClick={() => setViolationsOpen(!violationsOpen)}
+              className="flex items-center gap-1.5 text-xs font-medium text-destructive hover:text-destructive/80 transition-colors"
+            >
+              <AlertTriangle size={12} />
+              {violations.length} consistency {violations.length === 1 ? "issue" : "issues"} detected
+              {violationsOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+            {violationsOpen && (
+              <div className="mt-2 space-y-1">
+                {violations.map((v, i) => (
+                  <div key={i} className="text-[0.6rem] font-mono-code text-muted-foreground flex items-start gap-1.5">
+                    <span className={`mt-0.5 w-1.5 h-1.5 rounded-full shrink-0 ${v.severity === "error" ? "bg-destructive" : "bg-yellow-500"}`} />
+                    {v.description}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Invariant reactions */}
         {data.invariants.length > 0 && (
