@@ -8,6 +8,7 @@ import { TemperatureSlider } from "@/components/TemperatureSlider";
 import { BinaryPhaseDiagram } from "@/components/BinaryPhaseDiagram";
 import type { SimulationResult } from "@/components/BinaryPhaseDiagram";
 import { SimulationLoader } from "@/components/SimulationLoader";
+import { ComputeModal } from "@/components/ComputeModal";
 import { getBinaryDiagram } from "@/data/binaryPhaseDiagrams";
 import { FlaskConical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +26,7 @@ const Index = () => {
   const [binaryError, setBinaryError] = useState<string | null>(null);
   const [simulating, setSimulating] = useState(false);
   const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
+  const [computeModalOpen, setComputeModalOpen] = useState(false);
 
   const handleElementClick = useCallback(
     (el: Element) => {
@@ -69,9 +71,9 @@ const Index = () => {
     if (!binarySelection[0] || !binarySelection[1]) return;
     const diagram = getBinaryDiagram(binarySelection[0].number, binarySelection[1].number);
     if (!diagram) {
-      setBinaryError(
-        `No CALPHAD data available for ${binarySelection[0].symbol}–${binarySelection[1].symbol}. Try: Fe–C, Cu–Zn, Al–Cu, Ti–Al, Ni–Al, Pb–Sn, Si–Ge, Au–Cu, Fe–Ni, Cu–Sn, Al–Si, Ag–Cu.`,
-      );
+      // No CALPHAD data — open compute modal
+      setBinaryError(null);
+      setComputeModalOpen(true);
       return;
     }
     setBinaryError(null);
@@ -240,6 +242,21 @@ const Index = () => {
           data={binaryDiagramData}
           onClose={() => setBinaryDiagramOpen(false)}
           simulationResult={simulationResult}
+        />
+      )}
+
+      {/* Compute Modal for missing diagrams */}
+      {binarySelection[0] && binarySelection[1] && (
+        <ComputeModal
+          open={computeModalOpen}
+          onOpenChange={setComputeModalOpen}
+          elementA={{ number: binarySelection[0].number, symbol: binarySelection[0].symbol, name: binarySelection[0].name }}
+          elementB={{ number: binarySelection[1].number, symbol: binarySelection[1].symbol, name: binarySelection[1].name }}
+          onResult={(result) => {
+            setSimulationResult(result);
+            setComputeModalOpen(false);
+            toast.success("Computation result received");
+          }}
         />
       )}
     </div>

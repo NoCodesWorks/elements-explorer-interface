@@ -44,6 +44,7 @@ export interface BinaryPhaseDiagramData {
   invariants: InvariantReaction[];
   zones: PhaseZone[];
   notes: string;
+  maxComposition?: number; // Max x-axis value (defaults to 1.0)
 }
 
 function makeKey(a: number, b: number): string {
@@ -91,6 +92,7 @@ const binaryDiagrams: Record<string, BinaryPhaseDiagramData> = {
     elementB: "C",
     elementANumber: 26,
     elementBNumber: 6,
+    maxComposition: 0.25, // Cementite region — full view; zoom to 0.0667 for steel region
     notes: "Metastable Fe–Fe₃C system at 1 atm. Classic steel phase diagram.",
     regions: [
       { name: "α-Fe (Ferrite)", color: "hsl(200, 80%, 55%)" },
