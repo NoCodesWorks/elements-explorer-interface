@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { elements } from "@/data/elements";
 import type { Element, ElementCategory } from "@/data/elements";
 import { ElementCard } from "@/components/ElementCard";
@@ -57,22 +57,26 @@ const Index = () => {
     return undefined;
   };
 
+  const animationDoneRef = useRef(false);
+  const resolverDoneRef = useRef(false);
+
   const handleGenerate = async () => {
     if (!binarySelection[0] || !binarySelection[1]) return;
     setBinaryError(null);
     setSimulationResult(null);
+    animationDoneRef.current = false;
+    resolverDoneRef.current = false;
     setSimulating(true);
 
     // Use the multi-tier resolver
-    await resolver.resolve(binarySelection[0], binarySelection[1]);
+    resolver.resolve(binarySelection[0], binarySelection[1]);
   };
 
-  // Watch resolver state to transition UI
-  const handleSimulationComplete = () => {
+  const finishSimulation = useCallback(() => {
+    if (!animationDoneRef.current || !resolverDoneRef.current) return;
     setSimulating(false);
 
     if (resolver.state.diagram) {
-      // If it's a CALPHAD diagram, also fire the backend for MP compounds
       if (resolver.state.dataSource === "calphad") {
         supabase.functions
           .invoke("binary-simulation", {
@@ -94,17 +98,22 @@ const Index = () => {
       }
       setBinaryDiagramOpen(true);
     } else if (resolver.state.error) {
-      // All tiers failed — show compute modal as fallback
       setComputeModalOpen(true);
     }
-  };
+  }, [resolver.state, binarySelection]);
 
-  // Check if resolver finished while simulating
-  const resolverDone = !resolver.state.resolving && simulating;
-  if (resolverDone) {
-    // Trigger completion after animation
-    // The SimulationLoader calls onComplete which triggers handleSimulationComplete
-  }
+  const handleAnimationComplete = useCallback(() => {
+    animationDoneRef.current = true;
+    finishSimulation();
+  }, [finishSimulation]);
+
+  // Watch resolver state completion
+  useEffect(() => {
+    if (!resolver.state.resolving && simulating) {
+      resolverDoneRef.current = true;
+      finishSimulation();
+    }
+  }, [resolver.state.resolving, simulating, finishSimulation]);
 
   const toggleBinaryMode = () => {
     setBinaryMode((prev) => {
@@ -231,7 +240,7 @@ const Index = () => {
       {simulating && binarySelection[0] && binarySelection[1] && (
         <SimulationLoader
           systemName={`${binarySelection[0].symbol}–${binarySelection[1].symbol}`}
-          onComplete={handleSimulationComplete}
+          onComplete={handleAnimationComplete}
         />
       )}
 
