@@ -76,6 +76,7 @@ const SlidesPage = () => {
               onSelectElement={store.setSelectedElementId}
               onUpdateElement={store.updateElement}
               onDeleteElement={store.deleteElement}
+              onAddElement={store.addElement}
             />
             <NotesPanel
               notes={store.currentSlide.notes}

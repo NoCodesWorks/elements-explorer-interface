@@ -96,8 +96,44 @@ export function SlideCanvas({
     setDragging(null);
   };
 
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    if (!onAddElement) return;
+    const files = e.dataTransfer.files;
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith("image/")) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new window.Image();
+        img.onload = () => {
+          const maxW = 1200;
+          const maxH = 800;
+          const ratio = Math.min(maxW / img.width, maxH / img.height, 1);
+          const w = Math.round(img.width * ratio);
+          const h = Math.round(img.height * ratio);
+          onAddElement(slideIndex, {
+            id: crypto.randomUUID(),
+            type: "image",
+            x: Math.round((1920 - w) / 2),
+            y: Math.round((1080 - h) / 2),
+            width: w,
+            height: h,
+            content: reader.result as string,
+          });
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  }, [onAddElement, slideIndex]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
+
   return (
-    <div className="flex-1 flex items-center justify-center bg-background p-4" tabIndex={0} onKeyDown={handleKeyDown}>
+    <div className="flex-1 flex items-center justify-center bg-background p-4" tabIndex={0} onKeyDown={handleKeyDown} onDrop={handleDrop} onDragOver={handleDragOver}>
       <ScaledSlide background={slide.background} className="w-full h-full">
         <div
           className="absolute inset-0"

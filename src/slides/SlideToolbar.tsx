@@ -117,6 +117,10 @@ export function SlideToolbar({
       <button onClick={addShape} className="p-2 rounded-md hover:bg-secondary text-muted-foreground" title="Add shape">
         <Square size={16} />
       </button>
+      <button onClick={() => fileRef.current?.click()} className="p-2 rounded-md hover:bg-secondary text-muted-foreground" title="Add image">
+        <Image size={16} />
+      </button>
+      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { handleImageFiles(e.target.files); e.target.value = ""; }} />
 
       <div className="w-px h-6 bg-border mx-1" />
 
