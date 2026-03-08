@@ -9,6 +9,7 @@ interface SlideCanvasProps {
   onSelectElement: (id: string | null) => void;
   onUpdateElement: (slideIndex: number, elementId: string, patch: Partial<SlideElement>) => void;
   onDeleteElement: (slideIndex: number, elementId: string) => void;
+  onAddElement?: (slideIndex: number, element: SlideElement) => void;
 }
 
 export function SlideCanvas({
