@@ -54,6 +54,37 @@ export function SlideToolbar({
     });
   };
 
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleImageFiles = (files: FileList | null) => {
+    if (!files) return;
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith("image/")) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new window.Image();
+        img.onload = () => {
+          const maxW = 1200;
+          const maxH = 800;
+          const ratio = Math.min(maxW / img.width, maxH / img.height, 1);
+          const w = Math.round(img.width * ratio);
+          const h = Math.round(img.height * ratio);
+          onAddElement({
+            id: crypto.randomUUID(),
+            type: "image",
+            x: Math.round((1920 - w) / 2),
+            y: Math.round((1080 - h) / 2),
+            width: w,
+            height: h,
+            content: reader.result as string,
+          });
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   return (
     <div className="h-12 border-b border-border bg-card flex items-center px-3 gap-1 shrink-0">
       <button onClick={onBack} className="p-2 rounded-md hover:bg-secondary text-muted-foreground" title="Back to app">
