@@ -14,7 +14,7 @@ interface SlideCanvasProps {
 
 export function SlideCanvas({
   slide, slideIndex, selectedElementId,
-  onSelectElement, onUpdateElement, onDeleteElement,
+  onSelectElement, onUpdateElement, onDeleteElement, onAddElement,
 }: SlideCanvasProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dragging, setDragging] = useState<{ id: string; startX: number; startY: number; elX: number; elY: number } | null>(null);
