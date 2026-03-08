@@ -1,6 +1,7 @@
+import { useRef } from "react";
 import {
   Plus, Trash2, Copy, Grid, Play, Type, Square, ChevronLeft,
-  Palette,
+  Palette, Image,
 } from "lucide-react";
 import type { EditorMode, SlideElement } from "./types";
 import { DEFAULT_THEMES } from "./types";
