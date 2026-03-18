@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Query AFLOW API with expanded property list
+    // Query AFLOW AFLUX API with expanded property list
     const selectFields = [
       "compound",
       "ael_bulk_modulus_vrh",
@@ -53,7 +53,9 @@ Deno.serve(async (req) => {
       "species",
     ].join(",");
 
-    const aflowUrl = `https://aflowlib.org/API/apropos/?species=${elementSymbol}&format=json&paging(1)&$select(${selectFields})`;
+    // Use AFLUX API (matchbook syntax) - species() uses comma-separated symbols
+    const aflowUrl = `https://aflowlib.org/API/aflux/?species(${elementSymbol}),nspecies(1),paging(1),$select(${selectFields}),format(json)`;
+    console.log("AFLOW URL:", aflowUrl);
 
     const aflowRes = await fetch(aflowUrl, {
       headers: { Accept: "application/json" },
@@ -62,12 +64,15 @@ Deno.serve(async (req) => {
     let aflowData: any[] = [];
     if (aflowRes.ok) {
       const text = await aflowRes.text();
+      console.log("AFLOW response length:", text.length, "preview:", text.substring(0, 200));
       try {
         aflowData = JSON.parse(text);
         if (!Array.isArray(aflowData)) aflowData = [];
       } catch {
         aflowData = [];
       }
+    } else {
+      console.log("AFLOW response status:", aflowRes.status);
     }
 
     const parseNum = (v: any) => (v != null && v !== "" && v !== "unavailable") ? parseFloat(v) : null;
