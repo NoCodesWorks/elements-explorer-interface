@@ -20,8 +20,40 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Query AFLOW API for the element
-    const aflowUrl = `https://aflowlib.org/API/apropos/?species=${elementSymbol}&format=json&paging(1)&$select(compound,Bvoigt,Gvoigt,enthalpy_atom,Egap,density)`;
+    // Query AFLOW API with expanded property list
+    const selectFields = [
+      "compound",
+      "ael_bulk_modulus_vrh",
+      "ael_shear_modulus_vrh",
+      "ael_youngs_modulus_vrh",
+      "ael_poisson_ratio",
+      "ael_debye_temperature",
+      "ael_pughs_modulus_ratio",
+      "ael_elastic_anisotropy",
+      "ael_speed_sound_average",
+      "ael_speed_sound_longitudinal",
+      "ael_speed_sound_transverse",
+      "agl_thermal_conductivity_300K",
+      "agl_thermal_expansion_300K",
+      "agl_debye",
+      "agl_gruneisen",
+      "agl_heat_capacity_Cp_300K",
+      "agl_heat_capacity_Cv_300K",
+      "Egap",
+      "Egap_type",
+      "energy_atom",
+      "enthalpy_atom",
+      "enthalpy_formation_atom",
+      "density",
+      "volume_atom",
+      "spacegroup_relax",
+      "lattice_system_relax",
+      "Pearson_symbol_relax",
+      "nspecies",
+      "species",
+    ].join(",");
+
+    const aflowUrl = `https://aflowlib.org/API/apropos/?species=${elementSymbol}&format=json&paging(1)&$select(${selectFields})`;
 
     const aflowRes = await fetch(aflowUrl, {
       headers: { Accept: "application/json" },
@@ -38,31 +70,67 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Extract best mechanical/thermal properties
-    const mechanicalProps = aflowData
-      .filter((entry: any) => entry.Bvoigt || entry.Gvoigt)
-      .slice(0, 5)
+    const parseNum = (v: any) => (v != null && v !== "" && v !== "unavailable") ? parseFloat(v) : null;
+    const parseStr = (v: any) => (v != null && v !== "" && v !== "unavailable") ? String(v) : null;
+
+    // Process entries - prioritize those with elastic data
+    const processed = aflowData
       .map((entry: any) => ({
         compound: entry.compound || elementSymbol,
-        bulkModulus: entry.Bvoigt ? parseFloat(entry.Bvoigt) : null,
-        shearModulus: entry.Gvoigt ? parseFloat(entry.Gvoigt) : null,
-        enthalpy: entry.enthalpy_atom ? parseFloat(entry.enthalpy_atom) : null,
-        bandGap: entry.Egap ? parseFloat(entry.Egap) : null,
-        density: entry.density ? parseFloat(entry.density) : null,
-      }));
+        species: parseStr(entry.species),
+        nspecies: parseNum(entry.nspecies),
+        // AEL Elastic
+        bulkModulus: parseNum(entry.ael_bulk_modulus_vrh),
+        shearModulus: parseNum(entry.ael_shear_modulus_vrh),
+        youngsModulus: parseNum(entry.ael_youngs_modulus_vrh),
+        poissonRatio: parseNum(entry.ael_poisson_ratio),
+        debyeTemperature: parseNum(entry.ael_debye_temperature),
+        pughsRatio: parseNum(entry.ael_pughs_modulus_ratio),
+        elasticAnisotropy: parseNum(entry.ael_elastic_anisotropy),
+        speedSoundAvg: parseNum(entry.ael_speed_sound_average),
+        speedSoundLong: parseNum(entry.ael_speed_sound_longitudinal),
+        speedSoundTrans: parseNum(entry.ael_speed_sound_transverse),
+        // AGL Thermal
+        thermalConductivity: parseNum(entry.agl_thermal_conductivity_300K),
+        thermalExpansion: parseNum(entry.agl_thermal_expansion_300K),
+        aglDebye: parseNum(entry.agl_debye),
+        gruneisen: parseNum(entry.agl_gruneisen),
+        heatCapacityCp: parseNum(entry.agl_heat_capacity_Cp_300K),
+        heatCapacityCv: parseNum(entry.agl_heat_capacity_Cv_300K),
+        // Electronic
+        bandGap: parseNum(entry.Egap),
+        bandGapType: parseStr(entry.Egap_type),
+        // Energetics
+        energyPerAtom: parseNum(entry.energy_atom),
+        enthalpy: parseNum(entry.enthalpy_atom),
+        formationEnthalpy: parseNum(entry.enthalpy_formation_atom),
+        // Structural
+        density: parseNum(entry.density),
+        volumePerAtom: parseNum(entry.volume_atom),
+        spaceGroup: parseStr(entry.spacegroup_relax),
+        latticeSystem: parseStr(entry.lattice_system_relax),
+        pearsonSymbol: parseStr(entry.Pearson_symbol_relax),
+      }))
+      .sort((a: any, b: any) => {
+        // Prioritize entries with more data
+        const scoreA = [a.bulkModulus, a.shearModulus, a.youngsModulus, a.thermalConductivity, a.bandGap].filter(Boolean).length;
+        const scoreB = [b.bulkModulus, b.shearModulus, b.youngsModulus, b.thermalConductivity, b.bandGap].filter(Boolean).length;
+        return scoreB - scoreA;
+      })
+      .slice(0, 8);
 
     // Cache in Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    if (mechanicalProps.length > 0) {
+    if (processed.length > 0) {
       await supabase.from("element_properties_cache").upsert(
         {
           element_number: elementNumber,
           source: "aflow",
           property_type: "mechanical",
-          data: mechanicalProps,
+          data: processed,
           fetched_at: new Date().toISOString(),
         },
         { onConflict: "element_number,source,property_type" }
@@ -73,9 +141,9 @@ Deno.serve(async (req) => {
       JSON.stringify({
         element: elementSymbol,
         elementNumber,
-        properties: mechanicalProps,
+        properties: processed,
         source: "AFLOW REST API",
-        count: mechanicalProps.length,
+        count: processed.length,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
