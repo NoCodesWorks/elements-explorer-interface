@@ -16,8 +16,8 @@ import { PhaseDiagram } from "@/components/PhaseDiagram";
 import { GibbsEnergyChart } from "@/components/GibbsEnergyChart";
 import { useMaterialsProject, hasMPData } from "@/hooks/useMaterialsProject";
 import { useDataOrchestrator } from "@/hooks/useDataOrchestrator";
-import { X, Database, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AflowProperties } from "@/components/AflowProperties";
+import { X } from "lucide-react";
 
 const categoryBgMap: Record<string, string> = {
   alkali: "bg-element-alkali",
