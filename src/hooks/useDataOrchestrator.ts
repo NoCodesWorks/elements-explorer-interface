@@ -1,13 +1,41 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface AflowProperty {
   compound: string;
+  species: string | null;
+  nspecies: number | null;
+  // AEL Elastic
   bulkModulus: number | null;
   shearModulus: number | null;
-  enthalpy: number | null;
+  youngsModulus: number | null;
+  poissonRatio: number | null;
+  debyeTemperature: number | null;
+  pughsRatio: number | null;
+  elasticAnisotropy: number | null;
+  speedSoundAvg: number | null;
+  speedSoundLong: number | null;
+  speedSoundTrans: number | null;
+  // AGL Thermal
+  thermalConductivity: number | null;
+  thermalExpansion: number | null;
+  aglDebye: number | null;
+  gruneisen: number | null;
+  heatCapacityCp: number | null;
+  heatCapacityCv: number | null;
+  // Electronic
   bandGap: number | null;
+  bandGapType: string | null;
+  // Energetics
+  energyPerAtom: number | null;
+  enthalpy: number | null;
+  formationEnthalpy: number | null;
+  // Structural
   density: number | null;
+  volumePerAtom: number | null;
+  spaceGroup: string | null;
+  latticeSystem: string | null;
+  pearsonSymbol: string | null;
 }
 
 export interface OrchestratorResult {
@@ -38,7 +66,6 @@ export function useDataOrchestrator(elementNumber: number, elementSymbol: string
       if (cached?.data) {
         const fetchedAt = new Date(cached.fetched_at);
         const hoursSince = (Date.now() - fetchedAt.getTime()) / (1000 * 60 * 60);
-        // Use cache if less than 24 hours old
         if (hoursSince < 24) {
           setData({
             properties: cached.data as unknown as AflowProperty[],
@@ -68,6 +95,11 @@ export function useDataOrchestrator(elementNumber: number, elementSymbol: string
       setLoading(false);
     }
   }, [elementNumber, elementSymbol]);
+
+  // Auto-fetch on mount
+  useEffect(() => {
+    queryAflow();
+  }, [queryAflow]);
 
   return { data, loading, error, queryAflow };
 }
