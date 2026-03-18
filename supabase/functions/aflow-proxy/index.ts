@@ -20,9 +20,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Query AFLOW AFLUX API with expanded property list
-    const selectFields = [
-      "compound",
+    // AFLUX API: property keywords are comma-separated at top level
+    // Use ael_bulk_modulus_vrh,Egap,density etc. as separate matchbook keywords
+    const propertyFields = [
       "ael_bulk_modulus_vrh",
       "ael_shear_modulus_vrh",
       "ael_youngs_modulus_vrh",
@@ -31,8 +31,6 @@ Deno.serve(async (req) => {
       "ael_pughs_modulus_ratio",
       "ael_elastic_anisotropy",
       "ael_speed_sound_average",
-      "ael_speed_sound_longitudinal",
-      "ael_speed_sound_transverse",
       "agl_thermal_conductivity_300K",
       "agl_thermal_expansion_300K",
       "agl_debye",
@@ -41,50 +39,68 @@ Deno.serve(async (req) => {
       "agl_heat_capacity_Cv_300K",
       "Egap",
       "Egap_type",
-      "energy_atom",
       "enthalpy_atom",
       "enthalpy_formation_atom",
       "density",
       "volume_atom",
-      "spacegroup_relax",
       "lattice_system_relax",
-      "Pearson_symbol_relax",
-      "nspecies",
-      "species",
-    ].join(",");
+    ];
 
-    // Use AFLUX API (matchbook syntax) - species() uses comma-separated symbols
-    const aflowUrl = `https://aflowlib.org/API/aflux/?species(${elementSymbol}),nspecies(1),paging(1),$select(${selectFields}),format(json)`;
-    console.log("AFLOW URL:", aflowUrl);
+    // Query 1: entries with elastic data
+    const elasticUrl = `https://aflowlib.org/API/aflux/?species(${elementSymbol}),nspecies(1),ael_bulk_modulus_vrh(*),${propertyFields.join(",")},paging(1),format(json)`;
+    // Query 2: all entries (fallback for non-elastic data)
+    const generalUrl = `https://aflowlib.org/API/aflux/?species(${elementSymbol}),nspecies(1),${propertyFields.join(",")},paging(1),format(json)`;
 
-    const aflowRes = await fetch(aflowUrl, {
-      headers: { Accept: "application/json" },
-    });
+    console.log("AFLOW elastic URL:", elasticUrl);
 
-    let aflowData: any[] = [];
-    if (aflowRes.ok) {
-      const text = await aflowRes.text();
-      console.log("AFLOW response length:", text.length, "preview:", text.substring(0, 200));
+    // Fetch both in parallel
+    const [elasticRes, generalRes] = await Promise.all([
+      fetch(elasticUrl, { headers: { Accept: "application/json" } }),
+      fetch(generalUrl, { headers: { Accept: "application/json" } }),
+    ]);
+
+    const parseAflowResponse = async (res: Response): Promise<any[]> => {
+      if (!res.ok) return [];
+      const text = await res.text();
       try {
-        aflowData = JSON.parse(text);
-        if (!Array.isArray(aflowData)) aflowData = [];
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) return parsed;
+        // AFLUX returns object with "N of M" keys
+        if (typeof parsed === "object" && parsed !== null) {
+          return Object.values(parsed);
+        }
+        return [];
       } catch {
-        aflowData = [];
+        return [];
       }
-    } else {
-      console.log("AFLOW response status:", aflowRes.status);
+    };
+
+    const [elasticData, generalData] = await Promise.all([
+      parseAflowResponse(elasticRes),
+      parseAflowResponse(generalRes),
+    ]);
+
+    console.log("Elastic entries:", elasticData.length, "General entries:", generalData.length);
+
+    // Merge: elastic entries first, then general entries not already included
+    const seenAuids = new Set<string>();
+    const allEntries: any[] = [];
+    for (const entry of [...elasticData, ...generalData]) {
+      const auid = entry.auid || entry.compound;
+      if (!seenAuids.has(auid)) {
+        seenAuids.add(auid);
+        allEntries.push(entry);
+      }
     }
 
-    const parseNum = (v: any) => (v != null && v !== "" && v !== "unavailable") ? parseFloat(v) : null;
+    const parseNum = (v: any) => (v != null && v !== "" && v !== "unavailable" && !isNaN(Number(v))) ? parseFloat(v) : null;
     const parseStr = (v: any) => (v != null && v !== "" && v !== "unavailable") ? String(v) : null;
 
-    // Process entries - prioritize those with elastic data
-    const processed = aflowData
+    const processed = allEntries
       .map((entry: any) => ({
         compound: entry.compound || elementSymbol,
-        species: parseStr(entry.species),
+        species: parseStr(Array.isArray(entry.species) ? entry.species.join(",") : entry.species),
         nspecies: parseNum(entry.nspecies),
-        // AEL Elastic
         bulkModulus: parseNum(entry.ael_bulk_modulus_vrh),
         shearModulus: parseNum(entry.ael_shear_modulus_vrh),
         youngsModulus: parseNum(entry.ael_youngs_modulus_vrh),
@@ -93,23 +109,19 @@ Deno.serve(async (req) => {
         pughsRatio: parseNum(entry.ael_pughs_modulus_ratio),
         elasticAnisotropy: parseNum(entry.ael_elastic_anisotropy),
         speedSoundAvg: parseNum(entry.ael_speed_sound_average),
-        speedSoundLong: parseNum(entry.ael_speed_sound_longitudinal),
-        speedSoundTrans: parseNum(entry.ael_speed_sound_transverse),
-        // AGL Thermal
+        speedSoundLong: null,
+        speedSoundTrans: null,
         thermalConductivity: parseNum(entry.agl_thermal_conductivity_300K),
         thermalExpansion: parseNum(entry.agl_thermal_expansion_300K),
         aglDebye: parseNum(entry.agl_debye),
         gruneisen: parseNum(entry.agl_gruneisen),
         heatCapacityCp: parseNum(entry.agl_heat_capacity_Cp_300K),
         heatCapacityCv: parseNum(entry.agl_heat_capacity_Cv_300K),
-        // Electronic
         bandGap: parseNum(entry.Egap),
         bandGapType: parseStr(entry.Egap_type),
-        // Energetics
-        energyPerAtom: parseNum(entry.energy_atom),
+        energyPerAtom: null,
         enthalpy: parseNum(entry.enthalpy_atom),
         formationEnthalpy: parseNum(entry.enthalpy_formation_atom),
-        // Structural
         density: parseNum(entry.density),
         volumePerAtom: parseNum(entry.volume_atom),
         spaceGroup: parseStr(entry.spacegroup_relax),
@@ -117,9 +129,8 @@ Deno.serve(async (req) => {
         pearsonSymbol: parseStr(entry.Pearson_symbol_relax),
       }))
       .sort((a: any, b: any) => {
-        // Prioritize entries with more data
-        const scoreA = [a.bulkModulus, a.shearModulus, a.youngsModulus, a.thermalConductivity, a.bandGap].filter(Boolean).length;
-        const scoreB = [b.bulkModulus, b.shearModulus, b.youngsModulus, b.thermalConductivity, b.bandGap].filter(Boolean).length;
+        const scoreA = [a.bulkModulus, a.shearModulus, a.youngsModulus, a.thermalConductivity, a.bandGap, a.density].filter(v => v != null).length;
+        const scoreB = [b.bulkModulus, b.shearModulus, b.youngsModulus, b.thermalConductivity, b.bandGap, b.density].filter(v => v != null).length;
         return scoreB - scoreA;
       })
       .slice(0, 8);
