@@ -190,7 +190,7 @@ export function BinaryPhaseDiagram({ data, onClose, simulationResult, confidence
           className="relative bg-card border border-border rounded-lg p-6 w-[620px] shadow-2xl max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
-          <button onClick={onClose} className="absolute top-3 right-3 text-muted-foreground hover:text-foreground transition-colors">
+          <button onClick={onClose} aria-label="Close phase diagram" className="absolute top-3 right-3 text-muted-foreground hover:text-foreground transition-colors">
             <X size={18} />
           </button>
 

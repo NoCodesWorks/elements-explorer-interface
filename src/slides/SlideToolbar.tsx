@@ -87,7 +87,7 @@ export function SlideToolbar({
 
   return (
     <div className="h-12 border-b border-border bg-card flex items-center px-3 gap-1 shrink-0">
-      <button onClick={onBack} className="p-2 rounded-md hover:bg-secondary text-muted-foreground" title="Back to app">
+      <button onClick={onBack} aria-label="Back to app" className="p-2 rounded-md hover:bg-secondary text-muted-foreground" title="Back to app">
         <ChevronLeft size={18} />
       </button>
 
@@ -99,28 +99,28 @@ export function SlideToolbar({
 
       <div className="w-px h-6 bg-border mx-1" />
 
-      <button onClick={onAddSlide} className="p-2 rounded-md hover:bg-secondary text-muted-foreground" title="Add slide">
+      <button onClick={onAddSlide} aria-label="Add slide" className="p-2 rounded-md hover:bg-secondary text-muted-foreground" title="Add slide">
         <Plus size={16} />
       </button>
-      <button onClick={onDuplicateSlide} className="p-2 rounded-md hover:bg-secondary text-muted-foreground" title="Duplicate">
+      <button onClick={onDuplicateSlide} aria-label="Duplicate slide" className="p-2 rounded-md hover:bg-secondary text-muted-foreground" title="Duplicate">
         <Copy size={16} />
       </button>
-      <button onClick={onDeleteSlide} className="p-2 rounded-md hover:bg-secondary text-destructive" title="Delete slide">
+      <button onClick={onDeleteSlide} aria-label="Delete slide" className="p-2 rounded-md hover:bg-secondary text-destructive" title="Delete slide">
         <Trash2 size={16} />
       </button>
 
       <div className="w-px h-6 bg-border mx-1" />
 
-      <button onClick={addTextBox} className="p-2 rounded-md hover:bg-secondary text-muted-foreground" title="Add text">
+      <button onClick={addTextBox} aria-label="Add text box" className="p-2 rounded-md hover:bg-secondary text-muted-foreground" title="Add text">
         <Type size={16} />
       </button>
-      <button onClick={addShape} className="p-2 rounded-md hover:bg-secondary text-muted-foreground" title="Add shape">
+      <button onClick={addShape} aria-label="Add shape" className="p-2 rounded-md hover:bg-secondary text-muted-foreground" title="Add shape">
         <Square size={16} />
       </button>
-      <button onClick={() => fileRef.current?.click()} className="p-2 rounded-md hover:bg-secondary text-muted-foreground" title="Add image">
+      <button onClick={() => fileRef.current?.click()} aria-label="Add image" className="p-2 rounded-md hover:bg-secondary text-muted-foreground" title="Add image">
         <Image size={16} />
       </button>
-      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { handleImageFiles(e.target.files); e.target.value = ""; }} />
+      <input ref={fileRef} type="file" accept="image/*" multiple aria-label="Upload images" className="hidden" onChange={(e) => { handleImageFiles(e.target.files); e.target.value = ""; }} />
 
       <div className="w-px h-6 bg-border mx-1" />
 
@@ -131,6 +131,7 @@ export function SlideToolbar({
           <button
             key={theme.name}
             onClick={() => onSetBackground(theme.background)}
+            aria-label={`Apply ${theme.name} theme`}
             className="w-5 h-5 rounded-full border border-border hover:ring-2 ring-primary transition-all"
             style={{ background: theme.background }}
             title={theme.name}
@@ -142,6 +143,7 @@ export function SlideToolbar({
 
       <button
         onClick={() => onSetMode(mode === "grid" ? "edit" : "grid")}
+        aria-label="Toggle grid view"
         className={`p-2 rounded-md transition-colors ${mode === "grid" ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-muted-foreground"}`}
         title="Grid view"
       >
@@ -149,6 +151,7 @@ export function SlideToolbar({
       </button>
       <button
         onClick={() => onSetMode("present")}
+        aria-label="Start presentation"
         className="p-2 rounded-md hover:bg-primary hover:text-primary-foreground text-muted-foreground transition-colors"
         title="Present (F5)"
       >
