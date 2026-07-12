@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { Thermometer, Atom, Box, FlaskConical, ArrowRight, ChevronRight } from "lucide-react";
 
 const features = [
@@ -34,6 +35,14 @@ const workflowSteps = [
 const Landing = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <Helmet>
+        <title>Interactive Periodic Table Explorer</title>
+        <meta name="description" content="Explore all 118 elements with a temperature-aware periodic table featuring live phase states, electron configurations, crystal structures, and binary phase diagrams." />
+        <link rel="canonical" href="https://elements-explorer-interface.lovable.app/" />
+        <meta property="og:title" content="Interactive Periodic Table Explorer" />
+        <meta property="og:description" content="A temperature-aware periodic table with real-time phase states, electron configurations, crystal structures, and binary phase diagrams." />
+        <meta property="og:url" content="https://elements-explorer-interface.lovable.app/" />
+      </Helmet>
       {/* Hero */}
       <section className="relative flex flex-col items-center justify-center text-center px-6 pt-24 pb-20 overflow-hidden">
         {/* Subtle glow behind title */}
