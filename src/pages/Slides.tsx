@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { useSlideStore } from "@/slides/useSlideStore";
 import { SlideToolbar } from "@/slides/SlideToolbar";
 import { SlideCanvas } from "@/slides/SlideCanvas";
@@ -33,6 +34,15 @@ const SlidesPage = () => {
 
   return (
     <div className="h-screen flex flex-col bg-background">
+      <Helmet>
+        <title>Periodic Table Slide Designer</title>
+        <meta name="description" content="Design and present interactive slides featuring the periodic table, phase diagrams, and element properties." />
+        <link rel="canonical" href="https://elements-explorer-interface.lovable.app/slides" />
+        <meta property="og:title" content="Periodic Table Slide Designer" />
+        <meta property="og:description" content="Design and present interactive slides featuring the periodic table, phase diagrams, and element properties." />
+        <meta property="og:url" content="https://elements-explorer-interface.lovable.app/slides" />
+      </Helmet>
+      <h1 className="sr-only">Periodic Table Slide Designer</h1>
       <SlideToolbar
         mode={store.mode}
         currentIndex={store.currentIndex}

@@ -1,0 +1,11 @@
+# Interactive Periodic Table Explorer
+
+> A visual, temperature-aware periodic table that shows real-time phase states, electron configurations, crystal structures, and binary phase diagrams for students, researchers, and materials scientists.
+
+The Interactive Periodic Table Explorer lets users explore all 118 elements, watch phase transitions as temperature changes, inspect electron shell and subshell diagrams, view 3D crystal structures, and simulate binary alloy phase diagrams using a multi-tier CALPHAD / Materials Project / ML pipeline.
+
+## Pages
+
+- [Landing](/): Product overview, key capabilities, and workflow.
+- [Periodic Table Explorer](/explore): Interactive periodic table with temperature slider, element details, and binary phase diagram mode.
+- [Slide Designer](/slides): Build interactive slides featuring periodic-table content.
