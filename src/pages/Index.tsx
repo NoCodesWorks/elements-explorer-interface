@@ -244,7 +244,7 @@ const Index = () => {
         </div>
 
         <Legend highlighted={highlighted} onHover={setHighlighted} />
-      </div>
+      </section>
 
       {!binaryMode && selected && <ElementDetail element={selected} onClose={() => setSelected(null)} temperature={temperature} />}
 
